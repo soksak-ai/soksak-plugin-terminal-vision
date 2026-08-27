@@ -13,6 +13,7 @@
   "entry": "main.js",
   "permissions": [
     "ui",
+    "programs",
     "ui:statusbar",
     "commands",
     "sidecar",
