@@ -62,10 +62,10 @@ interface SurfaceState {
 }
 
 /** Per-label counters a diagnostic command reads: what reached each presenter. */
-export const shownLog = new Map<string, { setShown: number; lastShown: boolean; focus: number; declWrites: number }>();
+export const shownLog = new Map<string, { setShown: number; lastShown: boolean; focus: number; declWrites: number; seq: Array<{ v: boolean; t: number }> }>();
 function logOf(label: string) {
   let entry = shownLog.get(label);
-  if (!entry) { entry = { setShown: 0, lastShown: true, focus: 0, declWrites: 0 }; shownLog.set(label, entry); }
+  if (!entry) { entry = { setShown: 0, lastShown: true, focus: 0, declWrites: 0, seq: [] }; shownLog.set(label, entry); }
   return entry;
 }
 
@@ -328,6 +328,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           const entry = logOf(label);
           entry.setShown += 1;
           entry.lastShown = next;
+          if (entry.seq.length < 10) entry.seq.push({ v: next, t: Date.now() % 1000000 });
           // The layer is composited above the document; an overlay can cover
           // it only by the declaration going invisible for the overlay's time.
           shown = next;
