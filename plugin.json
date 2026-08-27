@@ -215,6 +215,17 @@
           "en": "Working directory",
           "ko": "작업 디렉터리"
         }
+      },
+      {
+        "name": "shownlog",
+        "title": {
+          "en": "Shown log",
+          "ko": "표시 로그"
+        },
+        "description": {
+          "en": "What reached each pane's presenter: shown flips, focus events, declaration writes.",
+          "ko": "pane presenter 에 도달한 것: shown 전환, 포커스 이벤트, 선언 기록 수."
+        }
       }
     ],
     "nodes": [
