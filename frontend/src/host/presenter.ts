@@ -224,6 +224,13 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         void deliver({ verb: "focus" }).catch(() => {});
       };
       container.addEventListener("mousedown", onMousedown);
+      // The pane's focus is visible on the layer itself: the document cannot
+      // paint over a native surface, so the dim rides the declared alpha.
+      const onFocusChange = () => {
+        screen.setAttribute("data-native-alpha", document.activeElement === input ? "1" : "0.7");
+      };
+      input.addEventListener("focus", onFocusChange);
+      input.addEventListener("blur", onFocusChange);
 
       const state: SurfaceState = { sequence: null, cols: 0, rows: 0, offset: 0, historySize: 0, text: "", selection: "" };
       const ingest = (payload: Record<string, unknown>) => {
@@ -247,10 +254,14 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         metrics: () => null,
         fit() {
           const next = box();
+          const scale = document.defaultView?.devicePixelRatio ?? 1;
           source.pixelW = String(next.width);
           source.pixelH = String(next.height);
-          source.scale = String(document.defaultView?.devicePixelRatio ?? 1);
+          source.scale = String(scale);
           if (declared) screen.setAttribute("data-native-source", JSON.stringify(source));
+          // The declaration moves the layer; the verb moves the cells.
+          void deliver({ verb: "resize", pixelW: next.width, pixelH: next.height, scale })
+            .catch(() => {});
         },
         sendText: (data) => deliver({ verb: "input", data }).then(() => undefined),
         renderedOutputSequence: () => state.sequence,
@@ -298,6 +309,8 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           input.removeEventListener("keydown", onKeydown);
           input.removeEventListener("compositionend", onCompositionEnd);
           input.removeEventListener("paste", onPaste);
+          input.removeEventListener("focus", onFocusChange);
+          input.removeEventListener("blur", onFocusChange);
           container.removeEventListener("mousedown", onMousedown);
           screen.remove();
           input.remove();
