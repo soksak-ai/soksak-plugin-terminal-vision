@@ -329,31 +329,31 @@
     "sidecars": [
       {
         "id": "soksak-sidecar-pty",
-        "version": "0.0.12"
-      },
-      {
-        "id": "soksak-sidecar-terminal-alacritty",
-        "version": "0.0.18"
-      },
-      {
-        "id": "soksak-sidecar-terminal-ghostty",
-        "version": "0.0.18"
-      },
-      {
-        "id": "soksak-sidecar-terminal-kitty",
-        "version": "0.0.14"
-      },
-      {
-        "id": "soksak-sidecar-terminal-shitty",
         "version": "0.0.13"
       },
       {
-        "id": "soksak-sidecar-terminal-vt100",
+        "id": "soksak-sidecar-terminal-alacritty",
+        "version": "0.0.21"
+      },
+      {
+        "id": "soksak-sidecar-terminal-ghostty",
+        "version": "0.0.21"
+      },
+      {
+        "id": "soksak-sidecar-terminal-kitty",
         "version": "0.0.17"
       },
       {
+        "id": "soksak-sidecar-terminal-shitty",
+        "version": "0.0.16"
+      },
+      {
+        "id": "soksak-sidecar-terminal-vt100",
+        "version": "0.0.20"
+      },
+      {
         "id": "soksak-sidecar-terminal-wezterm",
-        "version": "0.0.17"
+        "version": "0.0.20"
       }
     ]
   }
