@@ -62,7 +62,7 @@ interface SurfaceState {
 }
 
 /** Per-label counters a diagnostic command reads: what reached each presenter. */
-export const shownLog = new Map<string, { setShown: number; lastShown: boolean; focus: number; declWrites: number; seq: Array<{ v: boolean; t: number }> }>();
+export const shownLog = new Map<string, { setShown: number; lastShown: boolean; focus: number; declWrites: number; seq: Array<{ v: boolean; d: number; t: number }> }>();
 function logOf(label: string) {
   let entry = shownLog.get(label);
   if (!entry) { entry = { setShown: 0, lastShown: true, focus: 0, declWrites: 0, seq: [] }; shownLog.set(label, entry); }
@@ -312,7 +312,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           const entry = logOf(label);
           entry.setShown += 1;
           entry.lastShown = next;
-          if (entry.seq.length < 10) entry.seq.push({ v: next, t: Date.now() % 1000000 });
+          if (entry.seq.length < 12) entry.seq.push({ v: next, d: dimNext, t: Date.now() % 1000000 });
           // visible hides the layer for an overlay's time; dim darkens it while
           // it stays shown but unfocused. Both live in the one declaration.
           shown = next;
