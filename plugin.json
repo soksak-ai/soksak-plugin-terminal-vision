@@ -1,0 +1,360 @@
+{
+  "id": "soksak-plugin-terminal-vision",
+  "name": {
+    "en": "Vision Terminal",
+    "ko": "Vision 터미널"
+  },
+  "version": "0.0.1",
+  "appVersionRequirement": "0.0.1",
+  "description": {
+    "en": "A terminal whose pixels are painted by its render sidecar into a native surface.",
+    "ko": "렌더 사이드카가 네이티브 표면에 픽셀을 그리는 터미널."
+  },
+  "entry": "main.js",
+  "permissions": [
+    "ui",
+    "ui:statusbar",
+    "commands",
+    "sidecar",
+    "secrets",
+    "terminal",
+    "surface",
+    "clipboard:write"
+  ],
+  "implements": [
+    {
+      "id": "soksak-spec-plugin-terminal",
+      "version": "0.0.8"
+    }
+  ],
+  "contributes": {
+    "views": [
+      {
+        "id": "content",
+        "title": {
+          "en": "Vision Terminal",
+          "ko": "Vision 터미널"
+        },
+        "icon": ">_",
+        "surfaces": [
+          "tab"
+        ],
+        "nativeSurface": true,
+        "status": [
+          "connecting",
+          "error"
+        ]
+      }
+    ],
+    "programs": [
+      {
+        "id": "terminal-vision",
+        "title": {
+          "en": "Vision Terminal",
+          "ko": "Vision 터미널"
+        },
+        "kind": "view",
+        "view": "content"
+      }
+    ],
+    "commands": [
+      {
+        "name": "status",
+        "title": {
+          "en": "Terminal status",
+          "ko": "터미널 상태"
+        }
+      },
+      {
+        "name": "wait",
+        "title": {
+          "en": "Wait for terminal phase",
+          "ko": "터미널 단계 대기"
+        }
+      },
+      {
+        "name": "archive",
+        "title": {
+          "en": "Archive terminal state",
+          "ko": "터미널 상태 보관"
+        }
+      },
+      {
+        "name": "send",
+        "title": {
+          "en": "Send input",
+          "ko": "입력 보내기"
+        },
+        "danger": "inject"
+      },
+      {
+        "name": "read",
+        "title": {
+          "en": "Read the screen",
+          "ko": "화면 읽기"
+        }
+      },
+      {
+        "name": "clear",
+        "title": {
+          "en": "Clear terminal",
+          "ko": "터미널 지우기"
+        }
+      },
+      {
+        "name": "focus",
+        "title": {
+          "en": "Focus terminal",
+          "ko": "터미널 포커스"
+        }
+      },
+      {
+        "name": "recovery-status",
+        "title": {
+          "en": "Terminal recovery status",
+          "ko": "터미널 복원 상태"
+        }
+      },
+      {
+        "name": "split",
+        "title": {
+          "en": "Split the terminal",
+          "ko": "터미널 분할"
+        }
+      },
+      {
+        "name": "pane.close",
+        "title": {
+          "en": "Close a pane",
+          "ko": "pane 닫기"
+        }
+      },
+      {
+        "name": "pane.focus",
+        "title": {
+          "en": "Focus a pane",
+          "ko": "pane 포커스"
+        }
+      },
+      {
+        "name": "pane.list",
+        "title": {
+          "en": "List panes",
+          "ko": "pane 목록"
+        }
+      },
+      {
+        "name": "pane.resize",
+        "title": {
+          "en": "Resize a pane",
+          "ko": "pane 크기 조절"
+        }
+      },
+      {
+        "name": "pane.equalize",
+        "title": {
+          "en": "Equalize the panes",
+          "ko": "pane 균등화"
+        }
+      },
+      {
+        "name": "pane.maximize",
+        "title": {
+          "en": "Maximize a pane",
+          "ko": "pane 최대화"
+        }
+      },
+      {
+        "name": "pane.broadcast",
+        "title": {
+          "en": "Broadcast input to every pane",
+          "ko": "모든 pane에 입력 전달"
+        }
+      },
+      {
+        "name": "pane.title",
+        "title": {
+          "en": "Set a pane title",
+          "ko": "pane 제목 설정"
+        }
+      },
+      {
+        "name": "scroll",
+        "title": {
+          "en": "Scroll the screen",
+          "ko": "화면 스크롤"
+        }
+      },
+      {
+        "name": "selection",
+        "title": {
+          "en": "Read or copy the selection",
+          "ko": "선택 읽기·복사"
+        }
+      },
+      {
+        "name": "input.compose",
+        "title": {
+          "en": "Compose input text",
+          "ko": "입력 텍스트 조합"
+        },
+        "danger": "inject"
+      },
+      {
+        "name": "exec",
+        "title": {
+          "en": "Run a command",
+          "ko": "명령 실행"
+        },
+        "danger": "inject"
+      },
+      {
+        "name": "cwd",
+        "title": {
+          "en": "Working directory",
+          "ko": "작업 디렉터리"
+        }
+      }
+    ],
+    "nodes": [
+      {
+        "id": "terminal-root",
+        "description": {
+          "en": "The terminal root",
+          "ko": "터미널 루트"
+        }
+      },
+      {
+        "id": "terminal-screen",
+        "description": {
+          "en": "The terminal screen",
+          "ko": "터미널 화면"
+        }
+      },
+      {
+        "id": "terminal-input",
+        "description": {
+          "en": "The terminal input",
+          "ko": "터미널 입력"
+        }
+      },
+      {
+        "id": "terminal-restore-status",
+        "description": {
+          "en": "The terminal recovery state",
+          "ko": "터미널 복원 상태"
+        }
+      },
+      {
+        "id": "pane",
+        "description": {
+          "en": "One terminal pane",
+          "ko": "터미널 pane 하나"
+        }
+      },
+      {
+        "id": "gutter",
+        "description": {
+          "en": "The strip between two panes",
+          "ko": "두 pane 사이의 띠"
+        }
+      }
+    ]
+  },
+  "configuration": [
+    {
+      "key": "engine",
+      "type": "enum",
+      "enum": [
+        "alacritty",
+        "ghostty",
+        "kitty",
+        "shitty",
+        "vt100",
+        "wezterm"
+      ],
+      "enumLabels": [
+        {
+          "en": "Alacritty",
+          "ko": "Alacritty"
+        },
+        {
+          "en": "Ghostty",
+          "ko": "Ghostty"
+        },
+        {
+          "en": "kitty",
+          "ko": "kitty"
+        },
+        {
+          "en": "shitty",
+          "ko": "shitty"
+        },
+        {
+          "en": "VT100",
+          "ko": "VT100"
+        },
+        {
+          "en": "WezTerm",
+          "ko": "WezTerm"
+        }
+      ],
+      "default": "alacritty",
+      "title": {
+        "en": "Terminal engine",
+        "ko": "터미널 엔진"
+      },
+      "description": {
+        "en": "The engine Sidecar a new terminal pane runs on. An open pane keeps its engine.",
+        "ko": "새 터미널 pane이 사용하는 엔진 Sidecar. 이미 열린 pane은 엔진을 유지합니다."
+      }
+    },
+    {
+      "key": "fontSize",
+      "type": "number",
+      "default": 13,
+      "min": 8,
+      "max": 40,
+      "title": {
+        "en": "Font size",
+        "ko": "글꼴 크기"
+      },
+      "description": {
+        "en": "Font size in CSS pixels.",
+        "ko": "CSS 픽셀 단위 글꼴 크기."
+      }
+    }
+  ],
+  "runtimeDependencies": {
+    "sidecars": [
+      {
+        "id": "soksak-sidecar-pty",
+        "version": "0.0.12"
+      },
+      {
+        "id": "soksak-sidecar-terminal-alacritty",
+        "version": "0.0.18"
+      },
+      {
+        "id": "soksak-sidecar-terminal-ghostty",
+        "version": "0.0.18"
+      },
+      {
+        "id": "soksak-sidecar-terminal-kitty",
+        "version": "0.0.14"
+      },
+      {
+        "id": "soksak-sidecar-terminal-shitty",
+        "version": "0.0.13"
+      },
+      {
+        "id": "soksak-sidecar-terminal-vt100",
+        "version": "0.0.17"
+      },
+      {
+        "id": "soksak-sidecar-terminal-wezterm",
+        "version": "0.0.17"
+      }
+    ]
+  }
+}
