@@ -178,28 +178,21 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       };
       const screen = document.createElement("div");
       screen.dataset.node = terminalNodeId("terminal-screen", options.nodeSuffix);
-      // The document behind the layer is what a translucent or parked pane
-      // blends with; the terminal's own background is the only honest ground.
-      const themeBg = (() => {
-        try { return (JSON.parse(source.theme) as { bg?: string }).bg ?? ""; }
-        catch { return ""; }
-      })();
-      Object.assign(screen.style, {
-        position: "absolute", inset: "0",
-        ...(themeBg ? { background: themeBg } : {}),
-      });
+      Object.assign(screen.style, { position: "absolute", inset: "0" });
       const generation = 1;
       let declared = false;
-      // The declaration is the single owner of visible and alpha: a rewrite
-      // that reset them to defaults erased every state set before it landed.
+      // The declaration is the single owner of visible and alpha. dim is the
+      // focus lighting the host reports (0..1), applied to the layer's own
+      // alpha exactly as the browser plugin does — the document veil above the
+      // layer cannot darken it.
       let shown = true;
-      let focused = false;
+      let dim = 0;
       const writeDeclaration = () => {
         logOf(label).declWrites += 1;
         for (const [name, value] of Object.entries(
           nativeTerminalAttributes({
             id: label, generation, source, layer: 10,
-            visible: shown, alpha: focused ? 1 : 0.7,
+            visible: shown, alpha: 1 - dim,
           }),
         )) {
           screen.setAttribute(name, value);
@@ -249,15 +242,6 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         void deliver({ verb: "focus" }).catch(() => {});
       };
       container.addEventListener("mousedown", onMousedown);
-      // The pane's focus is visible on the layer itself: the document cannot
-      // paint over a native surface, so the dim rides the declared alpha.
-      const onFocusChange = () => {
-        logOf(label).focus += 1;
-        focused = document.activeElement === input;
-        if (declared) writeDeclaration();
-      };
-      input.addEventListener("focus", onFocusChange);
-      input.addEventListener("blur", onFocusChange);
 
       const state: SurfaceState = { sequence: null, cols: 0, rows: 0, offset: 0, historySize: 0, text: "", selection: "" };
       const ingest = (payload: Record<string, unknown>) => {
@@ -324,16 +308,20 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           void deliver({ verb: "focus" }).catch(() => {});
           return true;
         },
-        setShown(next: boolean) {
+        setShown(next: boolean, dimNext = 0) {
           const entry = logOf(label);
           entry.setShown += 1;
           entry.lastShown = next;
           if (entry.seq.length < 10) entry.seq.push({ v: next, t: Date.now() % 1000000 });
-          // The layer is composited above the document; an overlay can cover
-          // it only by the declaration going invisible for the overlay's time.
+          // visible hides the layer for an overlay's time; dim darkens it while
+          // it stays shown but unfocused. Both live in the one declaration.
           shown = next;
+          dim = dimNext;
           if (declared) writeDeclaration();
-          else screen.setAttribute("data-native-visible", String(next));
+          else {
+            screen.setAttribute("data-native-visible", String(next));
+            screen.setAttribute("data-native-alpha", String(1 - dimNext));
+          }
         },
         scrollState: () => ({ offset: state.offset, historySize: state.historySize }),
         scrollLines(lines) {
@@ -351,8 +339,6 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           input.removeEventListener("keydown", onKeydown);
           input.removeEventListener("compositionend", onCompositionEnd);
           input.removeEventListener("paste", onPaste);
-          input.removeEventListener("focus", onFocusChange);
-          input.removeEventListener("blur", onFocusChange);
           container.removeEventListener("mousedown", onMousedown);
           screen.remove();
           input.remove();
