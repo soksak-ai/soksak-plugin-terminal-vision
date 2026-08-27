@@ -173,9 +173,16 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       Object.assign(screen.style, { position: "absolute", inset: "0" });
       const generation = 1;
       let declared = false;
+      // The declaration is the single owner of visible and alpha: a rewrite
+      // that reset them to defaults erased every state set before it landed.
+      let shown = true;
+      let focused = false;
       const writeDeclaration = () => {
         for (const [name, value] of Object.entries(
-          nativeTerminalAttributes({ id: label, generation, source, layer: 10 }),
+          nativeTerminalAttributes({
+            id: label, generation, source, layer: 10,
+            visible: shown, alpha: focused ? 1 : 0.7,
+          }),
         )) {
           screen.setAttribute(name, value);
         }
@@ -227,12 +234,11 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       // The pane's focus is visible on the layer itself: the document cannot
       // paint over a native surface, so the dim rides the declared alpha.
       const onFocusChange = () => {
-        screen.setAttribute("data-native-alpha", document.activeElement === input ? "1" : "0.7");
+        focused = document.activeElement === input;
+        if (declared) writeDeclaration();
       };
       input.addEventListener("focus", onFocusChange);
       input.addEventListener("blur", onFocusChange);
-      // The dim starts truthful: a pane that never took focus is unfocused.
-      onFocusChange();
 
       const state: SurfaceState = { sequence: null, cols: 0, rows: 0, offset: 0, historySize: 0, text: "", selection: "" };
       const ingest = (payload: Record<string, unknown>) => {
@@ -299,10 +305,12 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           void deliver({ verb: "focus" }).catch(() => {});
           return true;
         },
-        setShown(shown: boolean) {
+        setShown(next: boolean) {
           // The layer is composited above the document; an overlay can cover
           // it only by the declaration going invisible for the overlay's time.
-          screen.setAttribute("data-native-visible", String(shown));
+          shown = next;
+          if (declared) writeDeclaration();
+          else screen.setAttribute("data-native-visible", String(next));
         },
         scrollState: () => ({ offset: state.offset, historySize: state.historySize }),
         scrollLines(lines) {
