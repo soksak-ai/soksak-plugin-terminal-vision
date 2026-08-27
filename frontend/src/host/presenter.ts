@@ -201,9 +201,29 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         send(text);
       };
       input.addEventListener("keydown", onKeydown);
+      // Composed text (IME) reaches the pty only when the composition ends;
+      // encodeProxyKey drops every keydown while composing.
+      const onCompositionEnd = (event: CompositionEvent) => {
+        if (event.data) send(event.data);
+        input.value = "";
+      };
+      const onPaste = (event: ClipboardEvent) => {
+        event.preventDefault();
+        const text = event.clipboardData?.getData("text") ?? "";
+        if (text) send(text);
+      };
+      input.addEventListener("compositionend", onCompositionEnd);
+      input.addEventListener("paste", onPaste);
       if (!container.style.position) container.style.position = "relative";
       container.append(screen, input);
       live.add(label);
+      // The native layer passes clicks through; the container is what the
+      // click lands on, and the hidden textarea is where keys must go.
+      const onMousedown = () => {
+        input.focus();
+        void deliver({ verb: "focus" }).catch(() => {});
+      };
+      container.addEventListener("mousedown", onMousedown);
 
       const state: SurfaceState = { sequence: null, cols: 0, rows: 0, offset: 0, historySize: 0, text: "", selection: "" };
       const ingest = (payload: Record<string, unknown>) => {
@@ -276,6 +296,9 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           stateDoors.delete(label);
           live.delete(label);
           input.removeEventListener("keydown", onKeydown);
+          input.removeEventListener("compositionend", onCompositionEnd);
+          input.removeEventListener("paste", onPaste);
+          container.removeEventListener("mousedown", onMousedown);
           screen.remove();
           input.remove();
           void deliver({ verb: "stop", intent: "detach" }).catch(() => {});
