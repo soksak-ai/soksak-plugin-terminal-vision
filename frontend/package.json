@@ -15,10 +15,12 @@
     "verify": "pnpm typecheck && pnpm test && node build.mjs --check"
   },
   "dependencies": {
-    "@soksak/soksak-contract-plugin-terminal": "0.0.8"
+    "@soksak/soksak-contract-plugin-terminal": "0.0.10",
+    "@soksak/soksak-kit-plugin-terminal": "0.0.64"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
+    "jsdom": "30.0.1",
     "esbuild": "0.28.2",
     "typescript": "5.9.3",
     "vitest": "3.2.4"
