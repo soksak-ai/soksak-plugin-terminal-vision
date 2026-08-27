@@ -1,0 +1,43 @@
+# Vision — 네이티브 경로
+
+> 번역본. 정본은 [NATIVE.md](NATIVE.md) 이며 이 문서는 독립 규칙을 정의하지 않는다.
+
+vision pane 의 픽셀은 렌더 사이드카가 그린다. 이 플러그인은 표면을 선언하고 명령을 전달하고
+status 를 발행한다.
+
+## 프로세스 지도
+
+| 일 | 프로세스 |
+| --- | --- |
+| VT 파싱, 그리드 미러, 글리프 래스터화, Metal, IOSurface 링 | 엔진 사이드카(엔진마다 하나) |
+| 표면 합성, 키보드·IME·마우스 입력, 기하, 파킹 픽셀 | 애플리케이션(`wails-service-terminal-surface`) |
+| shell | pane 마다 PTY 사이드카의 자식 하나 |
+| 이 플러그인 | 선언·명령·status — 셀도 글리프도 프레임도 없음 |
+
+pane 은 프로세스를 더하지 않는다. 웹 콘텐츠 프로세스는 뜨거운 경로에 없다.
+
+## 규칙
+
+1. 뜨거운 경로에 웹뷰가 없다: 키·에코·프레임·페인트는 사이드카와 애플리케이션 AppKit 사이만
+   오간다.
+2. 픽셀은 그리드를 소유한 프로세스가 그린다. 이 저장소에 painter 가 생기면 그것이 이 플러그인이
+   없애려는 결함이다.
+3. 표면은 선언으로 생긴다. `data-native-*` 속성 일곱 개가 수명이다. 여는 명령은 없다.
+4. 거부는 이름을 담는다. 대체 renderer 없음, 조용한 대체 없음.
+5. 판정은 숫자다: `surface.composition`, `layout.alignment`, 서비스·사이드카가 발행하는 state,
+   관측용 `window.snapshot`.
+
+## 이 플러그인이 소비하는 이음매
+
+- `soksak-spec-sidecar-surface` — IOSurface 링, 채널, `surface.*` 명령.
+- `soksak-spec-plugin-terminal` — 모든 터미널 구현이 답하는 표준 명령·노드·status.
+- 공유 플러그인 kit 의 surface 배달 모드 — 프레임 루프 없는 분할·복원·status·명령 라우팅.
+
+## 검증
+
+```sh
+make verify REGISTRY=http://host:port/
+```
+
+성능 수치는 단계가 끝날 때마다 [PERF.md](PERF.md) 에 남는다. 목표치는 코드 전에 적고 뒤에 낮추지
+않는다.
