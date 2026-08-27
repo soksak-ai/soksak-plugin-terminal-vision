@@ -293,6 +293,11 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           void deliver({ verb: "focus" }).catch(() => {});
           return true;
         },
+        setShown(shown: boolean) {
+          // The layer is composited above the document; an overlay can cover
+          // it only by the declaration going invisible for the overlay's time.
+          screen.setAttribute("data-native-visible", String(shown));
+        },
         scrollState: () => ({ offset: state.offset, historySize: state.historySize }),
         scrollLines(lines) {
           void deliver({ verb: "scroll", lines }).then(ingest).catch(() => {});
