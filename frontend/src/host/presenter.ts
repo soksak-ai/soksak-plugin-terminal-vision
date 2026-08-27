@@ -61,6 +61,14 @@ interface SurfaceState {
   selection: string;
 }
 
+/** Per-label counters a diagnostic command reads: what reached each presenter. */
+export const shownLog = new Map<string, { setShown: number; lastShown: boolean; focus: number; declWrites: number }>();
+function logOf(label: string) {
+  let entry = shownLog.get(label);
+  if (!entry) { entry = { setShown: 0, lastShown: true, focus: 0, declWrites: 0 }; shownLog.set(label, entry); }
+  return entry;
+}
+
 // The state push from the service names its pane by label; the door routes it
 // without any timer of its own (idle IPC stays zero).
 const stateDoors = new Map<string, (payload: Record<string, unknown>) => void>();
@@ -187,6 +195,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       let shown = true;
       let focused = false;
       const writeDeclaration = () => {
+        logOf(label).declWrites += 1;
         for (const [name, value] of Object.entries(
           nativeTerminalAttributes({
             id: label, generation, source, layer: 10,
@@ -243,6 +252,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       // The pane's focus is visible on the layer itself: the document cannot
       // paint over a native surface, so the dim rides the declared alpha.
       const onFocusChange = () => {
+        logOf(label).focus += 1;
         focused = document.activeElement === input;
         if (declared) writeDeclaration();
       };
@@ -315,6 +325,9 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           return true;
         },
         setShown(next: boolean) {
+          const entry = logOf(label);
+          entry.setShown += 1;
+          entry.lastShown = next;
           // The layer is composited above the document; an overlay can cover
           // it only by the declaration going invisible for the overlay's time.
           shown = next;

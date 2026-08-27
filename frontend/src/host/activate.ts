@@ -7,7 +7,7 @@ import {
   type ProviderTerminalPluginHost,
 } from "@soksak/soksak-kit-plugin-terminal";
 import { manifest } from "../manifest";
-import { createVisionRenderer, type SurfaceApp } from "./presenter";
+import { createVisionRenderer, shownLog, type SurfaceApp } from "./presenter";
 
 export const PLUGIN_ID = "soksak-plugin-terminal-vision";
 export const ENGINES = ["alacritty", "ghostty", "kitty", "shitty", "vt100", "wezterm"] as const;
@@ -45,6 +45,12 @@ export function activate(context: ActivateContext): void {
           if (!screen?.writable) return { sent: false };
           screen.send(`${cmd}\r`);
           return { view: screen.pane, sent: cmd.length + 1 };
+        },
+      },
+      {
+        name: "shownlog", params: {},
+        handler() {
+          return { panes: Object.fromEntries(shownLog) };
         },
       },
       {
