@@ -1,0 +1,140 @@
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from "vitest";
+import {
+  createVisionRenderer,
+  encodeProxyKey,
+  ingestTerminalSurfaceState,
+  type SurfaceApp,
+} from "./presenter";
+
+interface Delivered { label: string; message: Record<string, unknown> }
+
+function fakeApp(overrides: Partial<SurfaceApp> = {}) {
+  const delivered: Delivered[] = [];
+  const providers: Parameters<NonNullable<SurfaceApp["provideSurfaceInput"]>>[0][] = [];
+  const app: SurfaceApp = {
+    surface: {
+      label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+      deliver: async (label, message) => {
+        delivered.push({ label, message });
+        if (message.verb === "read") return { text: "ready\n$ " };
+        if (message.verb === "state") return { sequence: 3, cols: 80, rows: 24 };
+        return {};
+      },
+    },
+    provideSurfaceInput: (provider) => {
+      providers.push(provider);
+      return () => {};
+    },
+    settings: { get: () => undefined },
+    ...overrides,
+  };
+  return { app, delivered, providers };
+}
+
+const options = {
+  nodeSuffix: "1",
+  hostPixels: () => ({ width: 640, height: 384 }),
+  requestViewport: () => {},
+};
+
+describe("the vision surface presenter", () => {
+  it("declares one native pane under the terminal kind with a complete source", () => {
+    const { app } = fakeApp();
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-a.2", () => {}, options);
+    const screen = container.querySelector('[data-native-surface="terminal"]');
+    expect(screen).not.toBeNull();
+    expect(screen!.getAttribute("data-native-surface-id")).toBe("terminal.win-test.tab-a-2");
+    const source = JSON.parse(screen!.getAttribute("data-native-source")!);
+    expect(source.pane).toBe("tab-a.2");
+    expect(source.window).toBe("win-test");
+    expect(source.ptyUnit).toBe("soksak-sidecar-pty");
+    expect(source.engineUnit).toBe("soksak-sidecar-terminal-alacritty");
+    expect(source.pixelW).toBe(640);
+    expect(source.pixelH).toBe(384);
+    expect(source.font.pt).toBe(13);
+    expect(source.theme.ansi).toHaveLength(256);
+    expect(source).not.toHaveProperty("cols");
+    presenter.dispose();
+  });
+
+  it("honors the engine setting when it names an offered engine", () => {
+    const { app } = fakeApp({ settings: { get: (key) => (key === "engine" ? "vt100" : undefined) } });
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
+    const source = JSON.parse(container.querySelector("[data-native-source]")!.getAttribute("data-native-source")!);
+    expect(source.engineUnit).toBe("soksak-sidecar-terminal-vt100");
+    presenter.dispose();
+  });
+
+  it("maps every presenter door onto its deliver verb", async () => {
+    const { app, delivered } = fakeApp();
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
+    await presenter.sendText!("ls\r");
+    presenter.read(4);
+    presenter.focus();
+    presenter.scrollTo!(5);
+    presenter.scrollLines!(-3);
+    presenter.selection!();
+    presenter.dispose();
+    await Promise.resolve();
+    const verbs = delivered.map((entry) => entry.message.verb);
+    expect(delivered[0]).toEqual({
+      label: "terminal.win-test.tab-a-1",
+      message: { verb: "input", data: "ls\r" },
+    });
+    expect(verbs).toContain("read");
+    expect(verbs).toContain("focus");
+    expect(verbs).toContain("selection");
+    expect(delivered.find((entry) => entry.message.verb === "scroll" && entry.message.offset === 5)).toBeTruthy();
+    expect(delivered.find((entry) => entry.message.verb === "scroll" && entry.message.lines === -3)).toBeTruthy();
+    expect(delivered.at(-1)!.message).toEqual({ verb: "stop", intent: "detach" });
+  });
+
+  it("reads the rendered sequence from the state push, not from a counter", () => {
+    const { app } = fakeApp();
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
+    expect(presenter.renderedOutputSequence!()).toBeNull();
+    expect(ingestTerminalSurfaceState({ label: "terminal.win-test.tab-a-1", sequence: 9, cols: 120, rows: 30 })).toBe(true);
+    expect(presenter.renderedOutputSequence!()).toBe(9);
+    expect(presenter.size()).toEqual({ cols: 120, rows: 30 });
+    presenter.dispose();
+    expect(ingestTerminalSurfaceState({ label: "terminal.win-test.tab-a-1", sequence: 10 })).toBe(false);
+  });
+
+  it("owns its labels for pointer input while the pane lives", () => {
+    const { app, providers } = fakeApp();
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
+    expect(providers).toHaveLength(1);
+    expect(providers[0].owns("terminal.win-test.tab-a-1")).toBe(true);
+    expect(providers[0].owns("terminal.win-test.tab-zz-9")).toBe(false);
+    presenter.dispose();
+    expect(providers[0].owns("terminal.win-test.tab-a-1")).toBe(false);
+  });
+
+  it("routes typed keys to the pane and leaves shortcuts alone", () => {
+    const send = vi.fn();
+    const { app } = fakeApp();
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-a.1", send, options);
+    const input = container.querySelector("textarea")!;
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "a", cancelable: true }));
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+    expect(send).toHaveBeenNthCalledWith(1, "a");
+    expect(send).toHaveBeenNthCalledWith(2, "\r");
+    expect(encodeProxyKey({ key: "c", ctrlKey: true, altKey: false, metaKey: false, isComposing: false })).toBe("\x03");
+    expect(encodeProxyKey({ key: "v", ctrlKey: false, altKey: false, metaKey: true, isComposing: false })).toBeNull();
+    presenter.dispose();
+  });
+
+  it("refuses by name when the surface capability is absent", () => {
+    const { app } = fakeApp({ surface: undefined });
+    const container = document.createElement("div");
+    expect(() => createVisionRenderer(app).create(container, "tab-a.1", () => {}, options))
+      .toThrow(/SURFACE_CAPABILITY_ABSENT/);
+  });
+});
