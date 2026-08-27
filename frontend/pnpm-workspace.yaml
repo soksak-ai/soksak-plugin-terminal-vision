@@ -1,2 +1,8 @@
 allowBuilds:
   esbuild: true
+# First-party packages ship through the local release train before any public
+# registry holds them; a release-age gate on our own scopes would query a
+# registry that has never heard of the package (core and kit hold the same rule).
+minimumReleaseAgeExclude:
+  - "@soksak/*"
+  - "@soksak-ai/*"
