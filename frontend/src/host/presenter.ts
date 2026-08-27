@@ -170,7 +170,16 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       };
       const screen = document.createElement("div");
       screen.dataset.node = terminalNodeId("terminal-screen", options.nodeSuffix);
-      Object.assign(screen.style, { position: "absolute", inset: "0" });
+      // The document behind the layer is what a translucent or parked pane
+      // blends with; the terminal's own background is the only honest ground.
+      const themeBg = (() => {
+        try { return (JSON.parse(source.theme) as { bg?: string }).bg ?? ""; }
+        catch { return ""; }
+      })();
+      Object.assign(screen.style, {
+        position: "absolute", inset: "0",
+        ...(themeBg ? { background: themeBg } : {}),
+      });
       const generation = 1;
       let declared = false;
       // The declaration is the single owner of visible and alpha: a rewrite
