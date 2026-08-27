@@ -231,6 +231,8 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       };
       input.addEventListener("focus", onFocusChange);
       input.addEventListener("blur", onFocusChange);
+      // The dim starts truthful: a pane that never took focus is unfocused.
+      onFocusChange();
 
       const state: SurfaceState = { sequence: null, cols: 0, rows: 0, offset: 0, historySize: 0, text: "", selection: "" };
       const ingest = (payload: Record<string, unknown>) => {
@@ -255,6 +257,10 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         fit() {
           const next = box();
           const scale = document.defaultView?.devicePixelRatio ?? 1;
+          // An unchanged box is not a resize. Re-sending it winds the pty
+          // through SIGWINCH and the shell repaints its prompt every time.
+          if (source.pixelW === String(next.width) && source.pixelH === String(next.height)
+            && source.scale === String(scale)) return;
           source.pixelW = String(next.width);
           source.pixelH = String(next.height);
           source.scale = String(scale);
