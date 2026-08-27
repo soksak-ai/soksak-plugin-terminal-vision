@@ -19,16 +19,21 @@ export interface TerminalSurfaceTheme {
 /** What the service needs to run one pane: identity, sidecar units, the pixel
  *  box, the face and the theme. Cell counts are absent on purpose — the sidecar
  *  computes cols and rows from the box (the app never counts cells). */
+/** The service reads the source as a string map: numbers travel as decimal
+ *  strings and the theme travels as one JSON document (compositor sources
+ *  hold strings only). */
 export interface TerminalSurfaceSource {
   window: string;
   pane: string;
   ptyUnit: string;
   engineUnit: string;
-  pixelW: number;
-  pixelH: number;
-  scale: number;
-  font: { family: string; pt: number };
-  theme: TerminalSurfaceTheme;
+  pixelW: string;
+  pixelH: string;
+  scale: string;
+  fontFamily: string;
+  fontPt: string;
+  theme: string;
+  shell: string;
   cwd?: string;
 }
 

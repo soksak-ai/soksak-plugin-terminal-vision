@@ -13,14 +13,16 @@ const source: TerminalSurfaceSource = {
   pane: "tab-b.2",
   ptyUnit: "soksak-sidecar-pty",
   engineUnit: "soksak-sidecar-terminal-alacritty",
-  pixelW: 640,
-  pixelH: 384,
-  scale: 2,
-  font: { family: "Menlo", pt: 13 },
-  theme: {
+  pixelW: "640",
+  pixelH: "384",
+  scale: "2",
+  fontFamily: "Menlo",
+  fontPt: "13",
+  theme: JSON.stringify({
     fg: "#e6e6e6", bg: "#0a0a0a", cursor: "#e6e6e6", cursorAccent: "#0a0a0a",
     selectionBg: "#264f78", selectionFg: "#e6e6e6", ansi: ["#000000"],
-  },
+  }),
+  shell: "/bin/zsh",
 };
 
 describe("the terminal surface declaration", () => {

@@ -114,6 +114,20 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       inputState: (label, at) => surface.deliver(label, { verb: "state", ...(at ? { at } : {}) }),
     });
   };
+  let loginShellPromise: Promise<string> | null = null;
+  const loginShell = () => (loginShellPromise ??= (async () => {
+    // The kit host carries the commands door; its exact type stays the kit's.
+    const commands = (app as { commands?: { execute?(name: string, args: Record<string, unknown>): Promise<unknown> } }).commands;
+    const executed = await commands?.execute?.("app.environment", {});
+    const data = executed && typeof executed === "object" && "data" in executed
+      ? (executed as { data?: unknown }).data : executed;
+    const shell = data && typeof data === "object"
+      ? (data as { loginShell?: unknown }).loginShell : undefined;
+    if (typeof shell !== "string" || shell === "") {
+      throw new Error("app.environment returned no login shell");
+    }
+    return shell;
+  })());
   return {
     delivery: "surface",
     rendererId: "vision",
@@ -146,16 +160,19 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         pane,
         ptyUnit: PTY_UNIT,
         engineUnit: ENGINE_UNITS[engineOf()],
-        pixelW: pixels.width,
-        pixelH: pixels.height,
-        scale: document.defaultView?.devicePixelRatio ?? 1,
-        font: { family: primaryFontFamily(mono), pt: settingNumber("fontSize", 13) },
-        theme: readSurfaceTheme(container),
+        pixelW: String(pixels.width),
+        pixelH: String(pixels.height),
+        scale: String(document.defaultView?.devicePixelRatio ?? 1),
+        fontFamily: primaryFontFamily(mono),
+        fontPt: String(settingNumber("fontSize", 13)),
+        theme: JSON.stringify(readSurfaceTheme(container)),
+        shell: "",
       };
       const screen = document.createElement("div");
       screen.dataset.node = terminalNodeId("terminal-screen", options.nodeSuffix);
       Object.assign(screen.style, { position: "absolute", inset: "0" });
       const generation = 1;
+      let declared = false;
       const writeDeclaration = () => {
         for (const [name, value] of Object.entries(
           nativeTerminalAttributes({ id: label, generation, source, layer: 10 }),
@@ -163,7 +180,13 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           screen.setAttribute(name, value);
         }
       };
-      writeDeclaration();
+      // The declaration is complete only with the login shell; it lands as
+      // soon as app.environment answers, and never in a partial form.
+      void loginShell().then((shell) => {
+        source.shell = shell;
+        declared = true;
+        writeDeclaration();
+      });
       const input = document.createElement("textarea");
       input.dataset.node = terminalNodeId("terminal-input", options.nodeSuffix);
       input.setAttribute("aria-label", "terminal input");
@@ -204,10 +227,10 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         metrics: () => null,
         fit() {
           const next = box();
-          source.pixelW = next.width;
-          source.pixelH = next.height;
-          source.scale = document.defaultView?.devicePixelRatio ?? 1;
-          screen.setAttribute("data-native-source", JSON.stringify(source));
+          source.pixelW = String(next.width);
+          source.pixelH = String(next.height);
+          source.scale = String(document.defaultView?.devicePixelRatio ?? 1);
+          if (declared) screen.setAttribute("data-native-source", JSON.stringify(source));
         },
         sendText: (data) => deliver({ verb: "input", data }).then(() => undefined),
         renderedOutputSequence: () => state.sequence,
