@@ -1,0 +1,67 @@
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      spec_url:
+        description: Exact immutable soksak-spec package URL from the release train
+        required: true
+        type: string
+      spec_sha256:
+        description: SHA-256 of the exact soksak-spec package
+        required: true
+        type: string
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: soksak-plugins/soksak-plugin-terminal-vision
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: soksak-plugins/soksak-plugin-terminal-vision
+          persist-credentials: false
+      - name: Inject the exact spec validation tool
+        run: |
+          mkdir -p .dependency/spec-package
+          case "${{ inputs.spec_url }}" in
+            https://github.com/soksak-ai/soksak-spec/releases/download/v*/soksak-ai-plugin-spec-*.tgz) ;;
+            *) echo "spec_url is not an immutable soksak-spec release asset" >&2; exit 1 ;;
+          esac
+          digest="${{ inputs.spec_sha256 }}"
+          test "${#digest}" -eq 64
+          case "$digest" in *[!a-f0-9]*) echo "spec_sha256 is invalid" >&2; exit 1 ;; esac
+          curl -fsSL "${{ inputs.spec_url }}" -o .dependency/soksak-spec.tgz
+          test "$(sha256sum .dependency/soksak-spec.tgz | awk '{print $1}')" = "$digest"
+          tar -xzf .dependency/soksak-spec.tgz -C .dependency/spec-package --strip-components=1
+          test -z "$(find .dependency/spec-package -type l -print -quit)"
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+        with:
+          package_json_file: soksak-plugins/soksak-plugin-terminal-vision/frontend/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: soksak-plugins/soksak-plugin-terminal-vision/.node-version
+          cache: pnpm
+          cache-dependency-path: soksak-plugins/soksak-plugin-terminal-vision/frontend/pnpm-lock.yaml
+      - name: Run the repeatable owner proof
+        run: node .dependency/spec-package/release-template/verify-plugin-release.mjs --commit "${{ github.sha }}" --out dist-release --registry https://registry.npmjs.org/
+      - id: release-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          client-id: ${{ vars.SOKSAK_RELEASE_CLIENT_ID }}
+          private-key: ${{ secrets.SOKSAK_RELEASE_PRIVATE_KEY }}
+          permission-administration: read
+          permission-contents: write
+      - name: Publish the canonical immutable release
+        env:
+          SOKSAK_RELEASE_TOKEN: ${{ steps.release-token.outputs.token }}
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
+        run: |
+          test "$(gh api "repos/${{ github.repository }}/immutable-releases" --jq '.enabled and .enforced_by_owner')" = true || { echo "owner-enforced immutable releases must be enabled before tagging" >&2; exit 1; }
+          node .dependency/spec-package/release-template/publish-canonical-release.mjs --repository "${{ github.repository }}" --commit "${{ github.sha }}" --artifacts "$PWD/dist-release" --manifest "$PWD/dist-release/release.json"
