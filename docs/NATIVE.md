@@ -28,6 +28,9 @@ A pane adds no process. The web content process is not on the hot path.
 6. Cursor shape, visibility, position, blink policy and blink phase come from the engine and
    renderer `surface.state`. This plugin mirrors that state into the public terminal DOM and
    status event. It does not parse CSI or create a blink timer.
+7. The declaration carries an explicit `light|dark` base theme. A host theme epoch sends one
+   `surface.theme` command. Only a complete `surface.state` reply becomes `themeStatus`; no
+   unthemed fallback, effective-color comparison or polling path exists.
 
 The `shownlog` diagnostic command reports the count and last payload of surface frame events,
 successful state reads and failed reads per pane. A failed state delivery is recorded by name; it

@@ -29,6 +29,9 @@ pane 은 프로세스를 더하지 않는다. 웹 콘텐츠 프로세스는 뜨�
 6. 커서 모양·표시·위치·깜빡임 정책·현재 단계는 엔진과 renderer 의 `surface.state`에서 온다.
    이 플러그인은 그 상태를 공개 터미널 DOM과 status event에 투영한다. CSI를 파싱하거나 커서
    타이머를 만들지 않는다.
+7. 선언은 명시적인 `light|dark` base theme을 포함한다. Host theme epoch는 `surface.theme`
+   command 하나를 보낸다. 완전한 `surface.state` 응답만 `themeStatus`가 되며 unthemed fallback,
+   effective-color 비교, polling 경로는 없다.
 
 `shownlog` 진단 명령은 pane별 surface frame event, 성공한 state read, 실패한 read의 횟수와
 마지막 payload를 보고한다. state 전달 실패는 이름과 함께 기록하며 timer나 retry loop로 대체하지
