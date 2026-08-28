@@ -7,6 +7,7 @@
 export const SURFACE_KIND = "terminal";
 
 export interface TerminalSurfaceTheme {
+  mode: "light" | "dark";
   fg: string;
   bg: string;
   cursor: string;

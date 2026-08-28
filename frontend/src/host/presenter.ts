@@ -2,11 +2,16 @@
 // service that owns it. It opens no session, attaches no stream and polls no
 // frame — the pixels never pass through this process.
 import {
+  readTerminalThemeStatus,
   terminalNodeId,
   type TerminalPresenter,
   type TerminalPresenterOptions,
   type TerminalRendererAdapter,
 } from "@soksak/soksak-kit-plugin-terminal";
+import {
+  resolveTerminalTheme,
+  type TerminalThemeStatus,
+} from "@soksak/soksak-contract-plugin-terminal";
 import {
   SURFACE_KIND,
   nativeTerminalAttributes,
@@ -15,7 +20,7 @@ import {
   windowOfLabel,
   type TerminalSurfaceSource,
 } from "./surface";
-import { readSurfaceTheme } from "./theme";
+import { surfaceThemeFromStatus } from "./theme";
 
 export interface SurfaceCapability {
   label(kind: string, viewId: string): string;
@@ -68,6 +73,36 @@ interface SurfaceState {
   cursorShape: "block" | "underline" | "bar";
   cursorBlinking: boolean;
   cursorAnimation: { intervalMs: number; phase: "steady" | "on" | "off" };
+  theme: TerminalThemeStatus;
+}
+
+function cloneTerminalThemeStatus(status: TerminalThemeStatus): TerminalThemeStatus {
+  return {
+    themeMode: status.themeMode,
+    baseTheme: { ...status.baseTheme, ansi: [...status.baseTheme.ansi] },
+    terminalOverrides: { ...status.terminalOverrides, ansi: [...status.terminalOverrides.ansi] },
+    effectiveTheme: { ...status.effectiveTheme, ansi: [...status.effectiveTheme.ansi] },
+  };
+}
+
+function terminalThemeStatus(value: Record<string, unknown>): TerminalThemeStatus | null {
+  if (value.themeMode !== "light" && value.themeMode !== "dark") return null;
+  if (!value.baseTheme || typeof value.baseTheme !== "object"
+    || !value.terminalOverrides || typeof value.terminalOverrides !== "object"
+    || !value.effectiveTheme || typeof value.effectiveTheme !== "object") return null;
+  const candidate = {
+    themeMode: value.themeMode,
+    baseTheme: value.baseTheme,
+    terminalOverrides: value.terminalOverrides,
+    effectiveTheme: value.effectiveTheme,
+  } as TerminalThemeStatus;
+  try {
+    const expected = resolveTerminalTheme(candidate.baseTheme, candidate.terminalOverrides);
+    if (JSON.stringify(expected) !== JSON.stringify(candidate.effectiveTheme)) return null;
+    return cloneTerminalThemeStatus({ ...candidate, effectiveTheme: expected });
+  } catch {
+    return null;
+  }
 }
 
 interface PresenterObservation {
@@ -195,6 +230,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       };
       const mono = getComputedStyle(document.documentElement).getPropertyValue("--mono").trim();
       const pixels = box();
+      const initialThemeStatus = readTerminalThemeStatus(document.documentElement);
       const source: TerminalSurfaceSource = {
         window: windowOfLabel(label),
         pane,
@@ -205,7 +241,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         scale: String(document.defaultView?.devicePixelRatio ?? 1),
         fontFamily: primaryFontFamily(mono),
         fontPt: String(settingNumber("fontSize", 13)),
-        theme: JSON.stringify(readSurfaceTheme(container)),
+        theme: JSON.stringify(surfaceThemeFromStatus(initialThemeStatus)),
         shell: "",
       };
       const screen = document.createElement("div");
@@ -285,6 +321,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         sequence: null, cols: 0, rows: 0, offset: 0, historySize: 0, text: "", selection: "",
         cursorRow: 0, cursorColumn: 0, cursorVisible: false, cursorShape: "block",
         cursorBlinking: false, cursorAnimation: { intervalMs: 0, phase: "steady" },
+        theme: initialThemeStatus,
       };
       const presentationListeners = new Set<() => void>();
       const syncCursorPresentation = () => {
@@ -310,26 +347,26 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         if (typeof payload.offset === "number") state.offset = payload.offset;
         if (typeof payload.historySize === "number") state.historySize = payload.historySize;
         if (typeof payload.text === "string") state.text = payload.text;
-        let cursorChanged = false;
+        let presentationChanged = false;
         const setCursorNumber = (key: "cursorRow" | "cursorColumn", value: unknown) => {
           if (!Number.isSafeInteger(value) || Number(value) < 0 || state[key] === Number(value)) return;
           state[key] = Number(value);
-          cursorChanged = true;
+          presentationChanged = true;
         };
         setCursorNumber("cursorRow", payload.cursorRow);
         setCursorNumber("cursorColumn", payload.cursorColumn);
         if (typeof payload.cursorVisible === "boolean" && state.cursorVisible !== payload.cursorVisible) {
           state.cursorVisible = payload.cursorVisible;
-          cursorChanged = true;
+          presentationChanged = true;
         }
         if ((payload.cursorShape === "block" || payload.cursorShape === "underline" || payload.cursorShape === "bar")
           && state.cursorShape !== payload.cursorShape) {
           state.cursorShape = payload.cursorShape;
-          cursorChanged = true;
+          presentationChanged = true;
         }
         if (typeof payload.cursorBlinking === "boolean" && state.cursorBlinking !== payload.cursorBlinking) {
           state.cursorBlinking = payload.cursorBlinking;
-          cursorChanged = true;
+          presentationChanged = true;
         }
         const animation = payload.cursorAnimation;
         if (animation && typeof animation === "object") {
@@ -337,15 +374,20 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           if (Number.isFinite(value.intervalMs) && Number(value.intervalMs) >= 0
             && state.cursorAnimation.intervalMs !== Number(value.intervalMs)) {
             state.cursorAnimation.intervalMs = Number(value.intervalMs);
-            cursorChanged = true;
+            presentationChanged = true;
           }
           if ((value.phase === "steady" || value.phase === "on" || value.phase === "off")
             && state.cursorAnimation.phase !== value.phase) {
             state.cursorAnimation.phase = value.phase;
-            cursorChanged = true;
+            presentationChanged = true;
           }
         }
-        if (cursorChanged) {
+        const nextTheme = terminalThemeStatus(payload);
+        if (nextTheme && JSON.stringify(nextTheme) !== JSON.stringify(state.theme)) {
+          state.theme = nextTheme;
+          presentationChanged = true;
+        }
+        if (presentationChanged) {
           syncCursorPresentation();
           for (const listener of presentationListeners) listener();
         }
@@ -394,6 +436,17 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         },
         sendText: (data) => deliver({ verb: "input", data }).then(() => undefined),
         renderedOutputSequence: () => state.sequence,
+        themeStatus: () => cloneTerminalThemeStatus(state.theme),
+        async setTheme(next) {
+          const theme = surfaceThemeFromStatus(next);
+          const reply = await deliver({ verb: "theme", theme });
+          if (!terminalThemeStatus(reply)) {
+            throw new Error("surface.theme returned no valid terminal theme state");
+          }
+          source.theme = JSON.stringify(theme);
+          if (declared) screen.setAttribute("data-native-source", JSON.stringify(source));
+          ingest(reply);
+        },
         onPresentationChanged(callback) {
           presentationListeners.add(callback);
           return { dispose: () => void presentationListeners.delete(callback) };

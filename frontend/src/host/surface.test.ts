@@ -19,6 +19,7 @@ const source: TerminalSurfaceSource = {
   fontFamily: "Menlo",
   fontPt: "13",
   theme: JSON.stringify({
+    mode: "dark",
     fg: "#e6e6e6", bg: "#0a0a0a", cursor: "#e6e6e6", cursorAccent: "#0a0a0a",
     selectionBg: "#264f78", selectionFg: "#e6e6e6", ansi: ["#000000"],
   }),

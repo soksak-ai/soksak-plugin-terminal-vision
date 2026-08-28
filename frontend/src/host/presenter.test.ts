@@ -187,10 +187,14 @@ describe("the vision surface presenter", () => {
       themeMode: "light" as const, baseTheme, terminalOverrides,
       effectiveTheme: resolveTerminalTheme(baseTheme, terminalOverrides),
     };
-    const { app, delivered } = fakeApp({
+    const themeMessages: Record<string, unknown>[] = [];
+    const { app } = fakeApp({
       surface: {
         label: (kind, viewId) => `${kind}.win-test.${viewId}`,
-        deliver: async (_label, message) => message.verb === "theme" ? applied : {},
+        deliver: async (_label, message) => {
+          themeMessages.push(message);
+          return message.verb === "theme" ? applied : {};
+        },
       },
     });
     const presenter = createVisionRenderer(app).create(
@@ -202,7 +206,7 @@ describe("the vision surface presenter", () => {
     expect(typeof presenter.themeStatus).toBe("function");
     expect(typeof presenter.setTheme).toBe("function");
     await presenter.setTheme(applied);
-    expect(delivered.find((entry) => entry.message.verb === "theme")?.message)
+    expect(themeMessages.find((message) => message.verb === "theme"))
       .toMatchObject({ verb: "theme", theme: { mode: "light", fg: "#202020", bg: "#f0f0f0" } });
     expect(presenter.themeStatus()).toEqual(applied);
     presenter.dispose();
