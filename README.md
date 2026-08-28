@@ -14,5 +14,7 @@ repository holds the manifest, its gates and the build skeleton.
 ## Verification
 
 ```sh
+make lock REGISTRY=http://host:port/
 make verify REGISTRY=http://host:port/
+make attest OUT=/absolute/release-output STORE=/absolute/local/releases REGISTRY=http://host:port/
 ```
