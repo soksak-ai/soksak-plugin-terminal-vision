@@ -29,6 +29,10 @@ A pane adds no process. The web content process is not on the hot path.
    renderer `surface.state`. This plugin mirrors that state into the public terminal DOM and
    status event. It does not parse CSI or create a blink timer.
 
+The `shownlog` diagnostic command reports the count and last payload of surface frame events,
+successful state reads and failed reads per pane. A failed state delivery is recorded by name; it
+is not replaced by a timer or retry loop.
+
 ## Seams this plugin consumes
 
 - `soksak-spec-sidecar-surface` — the IOSurface ring, its channel and the `surface.*` commands.
