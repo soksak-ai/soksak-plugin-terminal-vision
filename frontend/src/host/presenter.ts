@@ -61,8 +61,10 @@ interface SurfaceState {
   selection: string;
 }
 
-/** Per-label counters a diagnostic command reads: what reached each presenter. */
-export const shownLog = new Map<string, { setShown: number; lastShown: boolean; focus: number; declWrites: number; seq: Array<{ v: boolean; d: number; t: number }> }>();
+/** Per-label counters a diagnostic command reads: what reached each presenter.
+ *  seq keeps the LAST 24 events; n is a global order across every pane. */
+export const shownLog = new Map<string, { setShown: number; lastShown: boolean; focus: number; declWrites: number; seq: Array<{ v: boolean; d: number; t: number; n: number }> }>();
+let shownEventCounter = 0;
 function logOf(label: string) {
   let entry = shownLog.get(label);
   if (!entry) { entry = { setShown: 0, lastShown: true, focus: 0, declWrites: 0, seq: [] }; shownLog.set(label, entry); }
@@ -191,7 +193,10 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         logOf(label).declWrites += 1;
         for (const [name, value] of Object.entries(
           nativeTerminalAttributes({
-            id: label, generation, source, layer: 10,
+            // All native surfaces share the compositor's default layer unless a contract owner
+            // explicitly requests ordering. The browser surface uses 0; inventing 10 here made
+            // terminal and browser presentation differ for no declared reason.
+            id: label, generation, source, layer: 0,
             visible: shown, alpha: 1 - dim,
           }),
         )) {
@@ -312,7 +317,8 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           const entry = logOf(label);
           entry.setShown += 1;
           entry.lastShown = next;
-          if (entry.seq.length < 12) entry.seq.push({ v: next, d: dimNext, t: Date.now() % 1000000 });
+          entry.seq.push({ v: next, d: dimNext, t: Date.now() % 1000000, n: ++shownEventCounter });
+          if (entry.seq.length > 24) entry.seq.shift();
           // visible hides the layer for an overlay's time; dim darkens it while
           // it stays shown but unfocused. Both live in the one declaration.
           shown = next;
