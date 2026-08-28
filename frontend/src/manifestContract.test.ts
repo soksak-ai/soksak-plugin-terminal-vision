@@ -10,6 +10,10 @@ describe("terminal plugin manifest contract", () => {
     expect(manifest.id).toBe("soksak-plugin-terminal-vision");
     expect(manifest.name).toEqual({ en: "Vision Terminal", ko: "Vision 터미널" });
     expect(manifest.version).toBe(pkg.version);
+    expect(pkg.dependencies).toEqual({
+      "@soksak/soksak-contract-plugin-terminal": "0.0.13",
+      "@soksak/soksak-kit-plugin-terminal": "0.0.71",
+    });
     expect(manifest).not.toHaveProperty("spec");
     expect(manifest.appVersionRequirement).toBe("0.0.1");
     expect(manifest.entry).toBe("main.js");
@@ -21,6 +25,7 @@ describe("terminal plugin manifest contract", () => {
     expect(manifest.permissions).toContain("surface");
     expect(manifest.permissions).not.toContain("webview");
     expect(manifest.permissions).toContain("ui:statusbar");
+    expect(manifest.permissions).toContain("clipboard:read");
     expect(manifest.permissions).toContain("clipboard:write");
 
     // One view, one native surface: the pane's pixels are a sidecar's IOSurface.
@@ -29,14 +34,15 @@ describe("terminal plugin manifest contract", () => {
     ]);
 
     const engines = ["alacritty", "ghostty", "kitty", "shitty", "vt100", "wezterm"];
-    expect(manifest.runtimeDependencies.sidecars.map((sidecar: { id: string }) => sidecar.id))
-      .toEqual(["soksak-sidecar-pty", ...engines.map((engine) => `soksak-sidecar-terminal-${engine}`)]);
-    for (const sidecar of manifest.runtimeDependencies.sidecars) {
-      expect(sidecar).toEqual({
-        id: expect.stringMatching(/^soksak-sidecar-[a-z0-9-]+$/),
-        version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
-      });
-    }
+    expect(manifest.runtimeDependencies.sidecars).toEqual([
+      { id: "soksak-sidecar-pty", version: "0.0.13" },
+      { id: "soksak-sidecar-terminal-alacritty", version: "0.0.23" },
+      { id: "soksak-sidecar-terminal-ghostty", version: "0.0.23" },
+      { id: "soksak-sidecar-terminal-kitty", version: "0.0.19" },
+      { id: "soksak-sidecar-terminal-shitty", version: "0.0.18" },
+      { id: "soksak-sidecar-terminal-vt100", version: "0.0.22" },
+      { id: "soksak-sidecar-terminal-wezterm", version: "0.0.22" },
+    ]);
 
     const setting = (key: string) => manifest.configuration.find((item: { key: string }) => item.key === key);
     expect(setting("engine")).toMatchObject({ type: "enum", enum: engines, default: "alacritty" });
@@ -47,12 +53,13 @@ describe("terminal plugin manifest contract", () => {
     const names = manifest.contributes.commands.map((command: { name: string }) => command.name);
     for (const name of ["split", "pane.close", "pane.focus", "pane.resize", "pane.equalize",
       "pane.maximize", "pane.broadcast", "pane.title", "scroll", "selection", "read", "send",
-      "status", "wait"]) {
+      "copy", "paste", "drop", "status", "wait"]) {
       expect(names).toContain(name);
     }
 
     const nodes = manifest.contributes.nodes.map((node: { id: string }) => node.id);
     for (const node of TERMINAL_PLUGIN_NODES) expect(nodes).toContain(node);
+    expect(nodes).toContain("terminal-drop-target");
     expect(nodes).toContain("pane");
     expect(nodes).toContain("gutter");
 
