@@ -324,6 +324,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         theme: initialThemeStatus,
       };
       const presentationListeners = new Set<() => void>();
+      const stateEventListeners = new Set<() => void>();
       const syncCursorPresentation = () => {
         screen.dataset.cursorRow = String(state.cursorRow);
         screen.dataset.cursorColumn = String(state.cursorColumn);
@@ -407,12 +408,18 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         }).catch((error) => {
           observation.stateFailures += 1;
           observation.lastError = String(error);
+        }).finally(() => {
+          for (const listener of stateEventListeners) listener();
         });
       });
-      const refreshText = (lines?: number) =>
-        deliver({ verb: "read", ...(typeof lines === "number" ? { lines } : {}) })
-          .then((reply) => { if (typeof reply.text === "string") state.text = reply.text; })
-          .catch(() => {});
+      const readText = async (lines?: number): Promise<string> => {
+        const reply = await deliver({ verb: "read", ...(typeof lines === "number" ? { lines } : {}) });
+        if (typeof reply.text !== "string") throw new Error("surface.read returned no text");
+        state.text = reply.text;
+        if (typeof lines !== "number" || lines <= 0) return state.text;
+        const rows = state.text.split("\n");
+        return rows.slice(Math.max(0, rows.length - lines)).join("\n");
+      };
 
       let disposed = false;
       return {
@@ -451,12 +458,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           presentationListeners.add(callback);
           return { dispose: () => void presentationListeners.delete(callback) };
         },
-        read(lines) {
-          void refreshText(lines);
-          if (typeof lines !== "number" || lines <= 0) return state.text;
-          const rows = state.text.split("\n");
-          return rows.slice(Math.max(0, rows.length - lines)).join("\n");
-        },
+        read: readText,
         selection() {
           void deliver({ verb: "selection" })
             .then((reply) => { if (typeof reply.text === "string") state.selection = reply.text; })
@@ -464,15 +466,47 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           return state.selection;
         },
         async waitForText(contains, timeoutMs) {
-          const until = Date.now() + Math.max(0, timeoutMs);
-          for (;;) {
-            await refreshText();
-            if (state.text.includes(contains)) return state.text;
-            if (Date.now() >= until) {
-              throw new Error(`TIMEOUT: ${JSON.stringify(contains)} did not appear within ${timeoutMs}ms`);
-            }
-            await new Promise((resolve) => setTimeout(resolve, 120));
-          }
+          return new Promise<string>((resolve, reject) => {
+            let reading = false;
+            let pending = false;
+            let settled = false;
+            const cleanup = () => {
+              clearTimeout(deadline);
+              stateEventListeners.delete(onState);
+            };
+            const finish = (answer: string) => {
+              if (settled) return;
+              settled = true;
+              cleanup();
+              resolve(answer);
+            };
+            const fail = (error: unknown) => {
+              if (settled) return;
+              settled = true;
+              cleanup();
+              reject(error);
+            };
+            const check = async () => {
+              if (settled) return;
+              if (reading) { pending = true; return; }
+              reading = true;
+              try {
+                const text = await readText();
+                if (text.includes(contains)) finish(text);
+              } catch (error) {
+                fail(error);
+              } finally {
+                reading = false;
+                if (pending && !settled) { pending = false; void check(); }
+              }
+            };
+            const onState = () => { void check(); };
+            const deadline = setTimeout(() => {
+              fail(new Error(`TIMEOUT: ${JSON.stringify(contains)} did not appear within ${timeoutMs}ms`));
+            }, Math.max(0, timeoutMs));
+            stateEventListeners.add(onState);
+            void check();
+          });
         },
         focus() {
           input.focus();
@@ -507,6 +541,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           if (disposed) return;
           disposed = true;
           stateDoors.delete(pane);
+          stateEventListeners.clear();
           live.delete(label);
           input.removeEventListener("keydown", onKeydown);
           input.removeEventListener("compositionend", onCompositionEnd);
