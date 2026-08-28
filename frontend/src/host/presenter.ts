@@ -62,6 +62,12 @@ interface SurfaceState {
   historySize: number;
   text: string;
   selection: string;
+  cursorRow: number;
+  cursorColumn: number;
+  cursorVisible: boolean;
+  cursorShape: "block" | "underline" | "bar";
+  cursorBlinking: boolean;
+  cursorAnimation: { intervalMs: number; phase: "steady" | "on" | "off" };
 }
 
 /** Per-label counters a diagnostic command reads: what reached each presenter.
@@ -254,7 +260,28 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       };
       container.addEventListener("mousedown", onMousedown);
 
-      const state: SurfaceState = { sequence: null, cols: 0, rows: 0, offset: 0, historySize: 0, text: "", selection: "" };
+      const state: SurfaceState = {
+        sequence: null, cols: 0, rows: 0, offset: 0, historySize: 0, text: "", selection: "",
+        cursorRow: 0, cursorColumn: 0, cursorVisible: false, cursorShape: "block",
+        cursorBlinking: false, cursorAnimation: { intervalMs: 0, phase: "steady" },
+      };
+      const presentationListeners = new Set<() => void>();
+      const syncCursorPresentation = () => {
+        screen.dataset.cursorRow = String(state.cursorRow);
+        screen.dataset.cursorColumn = String(state.cursorColumn);
+        screen.dataset.cursorVisible = String(state.cursorVisible);
+        screen.dataset.cursorShape = state.cursorShape;
+        screen.dataset.cursorBlinking = String(state.cursorBlinking);
+        screen.dataset.cursorAnimationIntervalMs = String(state.cursorAnimation.intervalMs);
+        screen.dataset.cursorAnimationPhase = state.cursorAnimation.phase;
+        screen.dataset.cursorActive = String(
+          state.cursorVisible && state.cursorAnimation.phase !== "off" && document.activeElement === input,
+        );
+      };
+      const onInputFocus = () => syncCursorPresentation();
+      input.addEventListener("focus", onInputFocus);
+      input.addEventListener("blur", onInputFocus);
+      syncCursorPresentation();
       const ingest = (payload: Record<string, unknown>) => {
         if (typeof payload.sequence === "number") state.sequence = Math.max(state.sequence ?? 0, payload.sequence);
         if (typeof payload.cols === "number") state.cols = payload.cols;
@@ -262,6 +289,45 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         if (typeof payload.offset === "number") state.offset = payload.offset;
         if (typeof payload.historySize === "number") state.historySize = payload.historySize;
         if (typeof payload.text === "string") state.text = payload.text;
+        let cursorChanged = false;
+        const setCursorNumber = (key: "cursorRow" | "cursorColumn", value: unknown) => {
+          if (!Number.isSafeInteger(value) || Number(value) < 0 || state[key] === Number(value)) return;
+          state[key] = Number(value);
+          cursorChanged = true;
+        };
+        setCursorNumber("cursorRow", payload.cursorRow);
+        setCursorNumber("cursorColumn", payload.cursorColumn);
+        if (typeof payload.cursorVisible === "boolean" && state.cursorVisible !== payload.cursorVisible) {
+          state.cursorVisible = payload.cursorVisible;
+          cursorChanged = true;
+        }
+        if ((payload.cursorShape === "block" || payload.cursorShape === "underline" || payload.cursorShape === "bar")
+          && state.cursorShape !== payload.cursorShape) {
+          state.cursorShape = payload.cursorShape;
+          cursorChanged = true;
+        }
+        if (typeof payload.cursorBlinking === "boolean" && state.cursorBlinking !== payload.cursorBlinking) {
+          state.cursorBlinking = payload.cursorBlinking;
+          cursorChanged = true;
+        }
+        const animation = payload.cursorAnimation;
+        if (animation && typeof animation === "object") {
+          const value = animation as { intervalMs?: unknown; phase?: unknown };
+          if (Number.isFinite(value.intervalMs) && Number(value.intervalMs) >= 0
+            && state.cursorAnimation.intervalMs !== Number(value.intervalMs)) {
+            state.cursorAnimation.intervalMs = Number(value.intervalMs);
+            cursorChanged = true;
+          }
+          if ((value.phase === "steady" || value.phase === "on" || value.phase === "off")
+            && state.cursorAnimation.phase !== value.phase) {
+            state.cursorAnimation.phase = value.phase;
+            cursorChanged = true;
+          }
+        }
+        if (cursorChanged) {
+          syncCursorPresentation();
+          for (const listener of presentationListeners) listener();
+        }
       };
       stateDoors.set(pane, (payload) => {
         ingest(payload);
@@ -296,6 +362,10 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         },
         sendText: (data) => deliver({ verb: "input", data }).then(() => undefined),
         renderedOutputSequence: () => state.sequence,
+        onPresentationChanged(callback) {
+          presentationListeners.add(callback);
+          return { dispose: () => void presentationListeners.delete(callback) };
+        },
         read(lines) {
           void refreshText(lines);
           if (typeof lines !== "number" || lines <= 0) return state.text;
@@ -356,7 +426,10 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           input.removeEventListener("keydown", onKeydown);
           input.removeEventListener("compositionend", onCompositionEnd);
           input.removeEventListener("paste", onPaste);
+          input.removeEventListener("focus", onInputFocus);
+          input.removeEventListener("blur", onInputFocus);
           container.removeEventListener("mousedown", onMousedown);
+          presentationListeners.clear();
           screen.remove();
           input.remove();
           void deliver({ verb: "stop", intent: "detach" }).catch(() => {});
