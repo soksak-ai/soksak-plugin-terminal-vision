@@ -15,8 +15,8 @@
     "verify": "pnpm typecheck && pnpm test && node build.mjs --check"
   },
   "dependencies": {
-    "@soksak/soksak-contract-plugin-terminal": "0.0.14",
-    "@soksak/soksak-kit-plugin-terminal": "0.0.74"
+    "@soksak/soksak-contract-plugin-terminal": "0.0.15",
+    "@soksak/soksak-kit-plugin-terminal": "0.0.75"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

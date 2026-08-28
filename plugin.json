@@ -26,7 +26,7 @@
   "implements": [
     {
       "id": "soksak-spec-plugin-terminal",
-      "version": "0.0.14"
+      "version": "0.0.15"
     }
   ],
   "contributes": {
@@ -368,27 +368,27 @@
       },
       {
         "id": "soksak-sidecar-terminal-alacritty",
-        "version": "0.0.28"
+        "version": "0.0.30"
       },
       {
         "id": "soksak-sidecar-terminal-ghostty",
-        "version": "0.0.28"
+        "version": "0.0.30"
       },
       {
         "id": "soksak-sidecar-terminal-kitty",
-        "version": "0.0.24"
+        "version": "0.0.26"
       },
       {
         "id": "soksak-sidecar-terminal-shitty",
-        "version": "0.0.23"
+        "version": "0.0.25"
       },
       {
         "id": "soksak-sidecar-terminal-vt100",
-        "version": "0.0.27"
+        "version": "0.0.29"
       },
       {
         "id": "soksak-sidecar-terminal-wezterm",
-        "version": "0.0.27"
+        "version": "0.0.29"
       }
     ]
   }
