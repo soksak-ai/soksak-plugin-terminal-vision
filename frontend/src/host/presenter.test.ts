@@ -57,6 +57,8 @@ describe("the vision surface presenter", () => {
     expect(source.pixelH).toBe("384");
     expect(source.fontPt).toBe("13");
     expect(source.shell).toBe("/bin/zsh");
+    expect(screen!.getAttribute("data-native-layer")).toBe("0");
+    expect(screen!.style.inset).toBe("0px");
     expect(JSON.parse(source.theme).ansi).toHaveLength(256);
     expect(source).not.toHaveProperty("cols");
     presenter.dispose();

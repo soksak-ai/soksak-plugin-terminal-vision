@@ -180,6 +180,9 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       };
       const screen = document.createElement("div");
       screen.dataset.node = terminalNodeId("terminal-screen", options.nodeSuffix);
+      // The native surface follows the pane's exact content geometry. Browser and terminal
+      // declarations must not invent separate insets; the compositor compares both in the same
+      // CSS coordinate space and any border belongs to the shared presentation layer.
       Object.assign(screen.style, { position: "absolute", inset: "0" });
       const generation = 1;
       let declared = false;
