@@ -1,12 +1,20 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import {
+  emptyTerminalThemeOverrides, resolveTerminalTheme, TERMINAL_ANSI_PALETTE,
+} from "@soksak/soksak-contract-plugin-terminal";
+import {
   createVisionRenderer,
   encodeProxyKey,
   ingestTerminalSurfaceState,
   shownLog,
   type SurfaceApp,
 } from "./presenter";
+
+for (const [name, value] of Object.entries({
+  fg: "#eeeeec", card: "#1e1e1e", acc: "#ffffff", fg3: "#555753",
+})) document.documentElement.style.setProperty(`--${name}`, value);
+document.documentElement.dataset.themeMode = "dark";
 
 interface Delivered { label: string; message: Record<string, unknown> }
 
@@ -60,6 +68,7 @@ describe("the vision surface presenter", () => {
     expect(source.shell).toBe("/bin/zsh");
     expect(screen!.getAttribute("data-native-layer")).toBe("0");
     expect((screen as HTMLElement).style.inset).toBe("0px");
+    expect(JSON.parse(source.theme)).toMatchObject({ mode: "dark", ansi: expect.any(Array) });
     expect(JSON.parse(source.theme).ansi).toHaveLength(256);
     expect(source).not.toHaveProperty("cols");
     presenter.dispose();
@@ -164,6 +173,49 @@ describe("the vision surface presenter", () => {
     subscription.dispose();
     presenter.dispose();
     container.remove();
+  });
+
+  it("forwards a complete host theme and exposes the applied engine state", async () => {
+    const terminalOverrides = emptyTerminalThemeOverrides();
+    terminalOverrides.foreground = "#abcdef";
+    const baseTheme = {
+      foreground: "#202020", background: "#f0f0f0", cursor: "#303030",
+      cursorAccent: "#f0f0f0", selectionBackground: "#c0c0c0",
+      ansi: [...TERMINAL_ANSI_PALETTE],
+    };
+    const applied = {
+      themeMode: "light" as const, baseTheme, terminalOverrides,
+      effectiveTheme: resolveTerminalTheme(baseTheme, terminalOverrides),
+    };
+    const { app, delivered } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => message.verb === "theme" ? applied : {},
+      },
+    });
+    const presenter = createVisionRenderer(app).create(
+      document.createElement("div"), "tab-a.1", () => {}, options,
+    ) as ReturnType<ReturnType<typeof createVisionRenderer>["create"]> & {
+      themeStatus(): typeof applied;
+      setTheme(status: typeof applied): Promise<void>;
+    };
+    expect(typeof presenter.themeStatus).toBe("function");
+    expect(typeof presenter.setTheme).toBe("function");
+    await presenter.setTheme(applied);
+    expect(delivered.find((entry) => entry.message.verb === "theme")?.message)
+      .toMatchObject({ verb: "theme", theme: { mode: "light", fg: "#202020", bg: "#f0f0f0" } });
+    expect(presenter.themeStatus()).toEqual(applied);
+    presenter.dispose();
+  });
+
+  it("refuses an undeclared host theme mode instead of using a fallback", () => {
+    const mode = document.documentElement.dataset.themeMode;
+    delete document.documentElement.dataset.themeMode;
+    const { app } = fakeApp();
+    expect(() => createVisionRenderer(app).create(
+      document.createElement("div"), "tab-a.1", () => {}, options,
+    )).toThrow(/theme mode/);
+    document.documentElement.dataset.themeMode = mode ?? "dark";
   });
 
   it("owns its labels for pointer input while the pane lives", async () => {
