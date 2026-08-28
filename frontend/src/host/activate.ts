@@ -7,12 +7,19 @@ import {
   type ProviderTerminalPluginHost,
 } from "@soksak/soksak-kit-plugin-terminal";
 import { manifest } from "../manifest";
-import { createVisionRenderer, shownLog, type SurfaceApp } from "./presenter";
+import { createVisionRenderer, ingestTerminalSurfaceState, shownLog, type SurfaceApp } from "./presenter";
 
 export const PLUGIN_ID = "soksak-plugin-terminal-vision";
 export const ENGINES = ["alacritty", "ghostty", "kitty", "shitty", "vt100", "wezterm"] as const;
 
-export interface TerminalHost extends ProviderTerminalPluginHost, SurfaceApp {
+interface TerminalHostEvents {
+  on(event: "layout.reflow", callback: () => void): { dispose(): void };
+  on(event: "window.gone", callback: (payload: { windowLabel?: string }) => void): { dispose(): void };
+  on(event: "terminal-surface.state", callback: (payload: { pane: string; sequence: number }) => void): { dispose(): void };
+}
+
+export interface TerminalHost extends Omit<ProviderTerminalPluginHost, "events">, Omit<SurfaceApp, "events"> {
+  events?: TerminalHostEvents;
   terminal?: ProviderTerminalPluginHost["terminal"] & { getCwd?(pane: string): string | undefined };
 }
 
@@ -23,6 +30,11 @@ export interface ActivateContext {
 
 export function activate(context: ActivateContext): void {
   const app = context.app;
+  if (app.events) {
+    context.subscriptions.push(app.events.on("terminal-surface.state", (payload) => {
+      ingestTerminalSurfaceState(payload);
+    }));
+  }
   const viewParam = { type: "string", description: { en: "Terminal view id", ko: "터미널 뷰 ID" } };
   const config = {
     pluginId: PLUGIN_ID,

@@ -38,6 +38,9 @@ export interface SurfaceApp {
     inputState(label: string, at?: { x: number; y: number }): Promise<Record<string, unknown>>;
   }): () => void;
   settings?: { get(key: string): unknown };
+  events?: {
+    on(event: "terminal-surface.state", listener: (payload: { pane: string; sequence: number }) => void): { dispose(): void };
+  };
 }
 
 export const PTY_UNIT = "soksak-sidecar-pty";
@@ -79,8 +82,8 @@ const stateDoors = new Map<string, (payload: Record<string, unknown>) => void>()
  *  whether a pane held that label. The core relays the service's push here
  *  once its event map carries the name; tests call it directly. */
 export function ingestTerminalSurfaceState(payload: Record<string, unknown>): boolean {
-  const label = typeof payload.label === "string" ? payload.label : "";
-  const door = stateDoors.get(label);
+  const pane = typeof payload.pane === "string" ? payload.pane : "";
+  const door = stateDoors.get(pane);
   if (!door) return false;
   door(payload);
   return true;
@@ -253,14 +256,19 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
 
       const state: SurfaceState = { sequence: null, cols: 0, rows: 0, offset: 0, historySize: 0, text: "", selection: "" };
       const ingest = (payload: Record<string, unknown>) => {
-        if (typeof payload.sequence === "number") state.sequence = payload.sequence;
+        if (typeof payload.sequence === "number") state.sequence = Math.max(state.sequence ?? 0, payload.sequence);
         if (typeof payload.cols === "number") state.cols = payload.cols;
         if (typeof payload.rows === "number") state.rows = payload.rows;
         if (typeof payload.offset === "number") state.offset = payload.offset;
         if (typeof payload.historySize === "number") state.historySize = payload.historySize;
         if (typeof payload.text === "string") state.text = payload.text;
       };
-      stateDoors.set(label, ingest);
+      stateDoors.set(pane, (payload) => {
+        ingest(payload);
+        // The event is the frame edge. Read the richer service-owned state once at that edge;
+        // no timer or polling loop reconstructs cols/rows from the DOM.
+        void deliver({ verb: "state" }).then(ingest).catch(() => {});
+      });
       const refreshText = (lines?: number) =>
         deliver({ verb: "read", ...(typeof lines === "number" ? { lines } : {}) })
           .then((reply) => { if (typeof reply.text === "string") state.text = reply.text; })
@@ -343,7 +351,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         dispose() {
           if (disposed) return;
           disposed = true;
-          stateDoors.delete(label);
+          stateDoors.delete(pane);
           live.delete(label);
           input.removeEventListener("keydown", onKeydown);
           input.removeEventListener("compositionend", onCompositionEnd);

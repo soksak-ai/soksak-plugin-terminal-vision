@@ -58,7 +58,7 @@ describe("the vision surface presenter", () => {
     expect(source.fontPt).toBe("13");
     expect(source.shell).toBe("/bin/zsh");
     expect(screen!.getAttribute("data-native-layer")).toBe("0");
-    expect(screen!.style.inset).toBe("0px");
+    expect((screen as HTMLElement).style.inset).toBe("0px");
     expect(JSON.parse(source.theme).ansi).toHaveLength(256);
     expect(source).not.toHaveProperty("cols");
     presenter.dispose();
@@ -106,11 +106,11 @@ describe("the vision surface presenter", () => {
     const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(presenter.renderedOutputSequence!()).toBeNull();
-    expect(ingestTerminalSurfaceState({ label: "terminal.win-test.tab-a-1", sequence: 9, cols: 120, rows: 30 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 9, cols: 120, rows: 30 })).toBe(true);
     expect(presenter.renderedOutputSequence!()).toBe(9);
     expect(presenter.size()).toEqual({ cols: 120, rows: 30 });
     presenter.dispose();
-    expect(ingestTerminalSurfaceState({ label: "terminal.win-test.tab-a-1", sequence: 10 })).toBe(false);
+    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 10 })).toBe(false);
   });
 
   it("owns its labels for pointer input while the pane lives", async () => {
