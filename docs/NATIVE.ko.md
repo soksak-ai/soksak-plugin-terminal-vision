@@ -30,8 +30,8 @@ pane 은 프로세스를 더하지 않는다. 웹 콘텐츠 프로세스는 뜨�
    이 플러그인은 그 상태를 공개 터미널 DOM과 status event에 투영한다. CSI를 파싱하거나 커서
    타이머를 만들지 않는다.
 7. 선언은 명시적인 `light|dark` base theme을 포함한다. Host theme epoch는 `surface.theme`
-   command 하나를 보낸다. 완전한 `surface.state` 응답만 `themeStatus`가 되며 unthemed fallback,
-   effective-color 비교, polling 경로는 없다.
+   command 하나를 보낸다. 완전한 `surface.state` 응답만 `themeStatus`가 되며 unthemed fallback과
+   polling 경로는 없다. Text wait는 state event를 구독하고 deadline timeout 하나만 사용한다.
 
 `shownlog` 진단 명령은 pane별 surface frame event, 성공한 state read, 실패한 read의 횟수와
 마지막 payload를 보고한다. state 전달 실패는 이름과 함께 기록하며 timer나 retry loop로 대체하지
