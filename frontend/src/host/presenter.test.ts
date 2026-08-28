@@ -110,6 +110,43 @@ describe("the vision surface presenter", () => {
     expect(delivered.at(-1)!.message).toEqual({ verb: "stop", intent: "detach" });
   });
 
+  it("awaits the native read and returns the requested trailing lines", async () => {
+    const { app } = fakeApp();
+    const presenter = createVisionRenderer(app).create(
+      document.createElement("div"), "tab-a.1", () => {}, options,
+    );
+    await expect(presenter.read(1)).resolves.toBe("$ ");
+    presenter.dispose();
+  });
+
+  it("waits for text from surface state events without polling", async () => {
+    let text = "";
+    let reads = 0;
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => {
+          if (message.verb === "read") { reads += 1; return { text }; }
+          if (message.verb === "state") return { sequence: 1, cols: 80, rows: 24 };
+          return {};
+        },
+      },
+    });
+    const presenter = createVisionRenderer(app).create(
+      document.createElement("div"), "tab-a.1", () => {}, options,
+    );
+    const waiting = presenter.waitForText("READY", 1000);
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(reads).toBe(1);
+    text = "READY";
+    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 2 })).toBe(true);
+    await expect(waiting).resolves.toBe("READY");
+    expect(reads).toBe(2);
+    presenter.dispose();
+  });
+
   it("reads the rendered sequence from the state push, not from a counter", async () => {
     const { app } = fakeApp();
     const container = document.createElement("div");
