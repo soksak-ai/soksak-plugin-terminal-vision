@@ -12,8 +12,8 @@ importers:
         specifier: 0.0.15
         version: 0.0.15
       '@soksak/soksak-kit-plugin-terminal':
-        specifier: 0.0.75
-        version: 0.0.75(@soksak/soksak-contract-plugin-terminal@0.0.15)
+        specifier: 0.0.76
+        version: 0.0.76(@soksak/soksak-contract-plugin-terminal@0.0.15)
     devDependencies:
       '@types/node':
         specifier: 26.2.0
@@ -398,8 +398,8 @@ packages:
     resolution: {integrity: sha512-ZQEr5NBPkWcMVEf36irktIgC6M7jKBzLfa9j1kNYhqfaP9GkwnYO8jLOP47saNRX21lCWyFG8vAgHWB+c6z7Jw==}
     engines: {node: 26.7.0}
 
-  '@soksak/soksak-kit-plugin-terminal@0.0.75':
-    resolution: {integrity: sha512-LcDnocAhHrquPB+z3NmHz+fjf/m9TgsrTBo+btoC71pYJxxrdJpIdJexData0PmB+4DwCgubhgEV396bS2iOPQ==}
+  '@soksak/soksak-kit-plugin-terminal@0.0.76':
+    resolution: {integrity: sha512-axQRqsPG5gHwy9Iih8yBoeht+26f1NF7TlTOwss0cTBhLbgOlJl7g4sq30DG/Xnkav3YRxP/0EsM4fOPaO7OJA==}
     engines: {node: 26.7.0}
     peerDependencies:
       '@soksak/soksak-contract-plugin-terminal': 0.0.15
@@ -982,7 +982,7 @@ snapshots:
 
   '@soksak/soksak-contract-plugin-terminal@0.0.15': {}
 
-  '@soksak/soksak-kit-plugin-terminal@0.0.75(@soksak/soksak-contract-plugin-terminal@0.0.15)':
+  '@soksak/soksak-kit-plugin-terminal@0.0.76(@soksak/soksak-contract-plugin-terminal@0.0.15)':
     dependencies:
       '@soksak/soksak-contract-plugin-terminal': 0.0.15
 
