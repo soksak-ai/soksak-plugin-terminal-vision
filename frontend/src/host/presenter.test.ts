@@ -4,6 +4,7 @@ import {
   createVisionRenderer,
   encodeProxyKey,
   ingestTerminalSurfaceState,
+  shownLog,
   type SurfaceApp,
 } from "./presenter";
 
@@ -114,6 +115,7 @@ describe("the vision surface presenter", () => {
   });
 
   it("publishes the engine cursor state through the terminal screen", async () => {
+    shownLog.clear();
     let phase: "on" | "off" = "off";
     const { app } = fakeApp({
       surface: {
@@ -140,6 +142,12 @@ describe("the vision surface presenter", () => {
     expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 9 })).toBe(true);
     const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
     await vi.waitFor(() => expect(screen.dataset.cursorShape).toBe("bar"));
+    expect(shownLog.get("terminal.win-test.tab-a-1")).toMatchObject({
+      stateEvents: 1,
+      stateReads: 1,
+      stateFailures: 0,
+      lastRead: { cursorShape: "bar", cursorVisible: true },
+    });
     expect(screen.dataset).toMatchObject({
       cursorRow: "3", cursorColumn: "7", cursorVisible: "true",
       cursorShape: "bar", cursorBlinking: "true",
