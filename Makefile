@@ -1,7 +1,7 @@
 SHELL := /bin/sh
 .PHONY: preflight guard lock prepare build verify require-tooling require-out require-store release attest
 registry_flags = --@soksak:registry=$(REGISTRY) --@soksak-ai:registry=$(REGISTRY) --config.minimum-release-age=0
-SDK_VERSION := 0.0.13
+SDK_VERSION := 0.0.14
 # REGISTRY is accepted from the make command line only ($(origin) must be "command line").
 # GNU make's own environment channels (MAKEFLAGS, GNUMAKEFLAGS, MAKEFILES, -e) are outside this
 # Makefile's control and are not refused; setting them is a deliberate act of the caller.
