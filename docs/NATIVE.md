@@ -25,6 +25,9 @@ A pane adds no process. The web content process is not on the hot path.
 4. Refusals carry names. No fallback renderer, no silent substitution.
 5. Judgement is numbers: `surface.composition`, `layout.alignment`, the state the service and
    sidecar publish, `window.snapshot` for observation.
+6. Cursor shape, visibility, position, blink policy and blink phase come from the engine and
+   renderer `surface.state`. This plugin mirrors that state into the public terminal DOM and
+   status event. It does not parse CSI or create a blink timer.
 
 ## Seams this plugin consumes
 

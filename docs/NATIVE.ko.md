@@ -26,6 +26,9 @@ pane 은 프로세스를 더하지 않는다. 웹 콘텐츠 프로세스는 뜨�
 4. 거부는 이름을 담는다. 대체 renderer 없음, 조용한 대체 없음.
 5. 판정은 숫자다: `surface.composition`, `layout.alignment`, 서비스·사이드카가 발행하는 state,
    관측용 `window.snapshot`.
+6. 커서 모양·표시·위치·깜빡임 정책·현재 단계는 엔진과 renderer 의 `surface.state`에서 온다.
+   이 플러그인은 그 상태를 공개 터미널 DOM과 status event에 투영한다. CSI를 파싱하거나 커서
+   타이머를 만들지 않는다.
 
 ## 이 플러그인이 소비하는 이음매
 
