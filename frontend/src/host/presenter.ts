@@ -70,13 +70,34 @@ interface SurfaceState {
   cursorAnimation: { intervalMs: number; phase: "steady" | "on" | "off" };
 }
 
+interface PresenterObservation {
+  setShown: number;
+  lastShown: boolean;
+  focus: number;
+  declWrites: number;
+  seq: Array<{ v: boolean; d: number; t: number; n: number }>;
+  stateEvents: number;
+  stateReads: number;
+  stateFailures: number;
+  lastEvent: Record<string, unknown> | null;
+  lastRead: Record<string, unknown> | null;
+  lastError: string | null;
+}
+
 /** Per-label counters a diagnostic command reads: what reached each presenter.
  *  seq keeps the LAST 24 events; n is a global order across every pane. */
-export const shownLog = new Map<string, { setShown: number; lastShown: boolean; focus: number; declWrites: number; seq: Array<{ v: boolean; d: number; t: number; n: number }> }>();
+export const shownLog = new Map<string, PresenterObservation>();
 let shownEventCounter = 0;
 function logOf(label: string) {
   let entry = shownLog.get(label);
-  if (!entry) { entry = { setShown: 0, lastShown: true, focus: 0, declWrites: 0, seq: [] }; shownLog.set(label, entry); }
+  if (!entry) {
+    entry = {
+      setShown: 0, lastShown: true, focus: 0, declWrites: 0, seq: [],
+      stateEvents: 0, stateReads: 0, stateFailures: 0,
+      lastEvent: null, lastRead: null, lastError: null,
+    };
+    shownLog.set(label, entry);
+  }
   return entry;
 }
 
@@ -330,10 +351,21 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         }
       };
       stateDoors.set(pane, (payload) => {
+        const observation = logOf(label);
+        observation.stateEvents += 1;
+        observation.lastEvent = { ...payload };
         ingest(payload);
         // The event is the frame edge. Read the richer service-owned state once at that edge;
         // no timer or polling loop reconstructs cols/rows from the DOM.
-        void deliver({ verb: "state" }).then(ingest).catch(() => {});
+        void deliver({ verb: "state" }).then((reply) => {
+          observation.stateReads += 1;
+          observation.lastRead = { ...reply };
+          observation.lastError = null;
+          ingest(reply);
+        }).catch((error) => {
+          observation.stateFailures += 1;
+          observation.lastError = String(error);
+        });
       });
       const refreshText = (lines?: number) =>
         deliver({ verb: "read", ...(typeof lines === "number" ? { lines } : {}) })
