@@ -113,6 +113,51 @@ describe("the vision surface presenter", () => {
     expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 10 })).toBe(false);
   });
 
+  it("publishes the engine cursor state through the terminal screen", async () => {
+    let phase: "on" | "off" = "off";
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => message.verb === "state" ? {
+          sequence: 9, cols: 120, rows: 30,
+          cursorRow: 3, cursorColumn: 7, cursorVisible: true,
+          cursorShape: "bar", cursorBlinking: true,
+          cursorAnimation: { intervalMs: 750, phase },
+        } : {},
+      },
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
+    const changed = vi.fn();
+    const presentation = presenter as typeof presenter & {
+      onPresentationChanged(callback: () => void): { dispose(): void };
+    };
+    expect(typeof presentation.onPresentationChanged).toBe("function");
+    const subscription = presentation.onPresentationChanged(changed);
+    const input = container.querySelector("textarea")!;
+    input.focus();
+    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 9 })).toBe(true);
+    const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
+    await vi.waitFor(() => expect(screen.dataset.cursorShape).toBe("bar"));
+    expect(screen.dataset).toMatchObject({
+      cursorRow: "3", cursorColumn: "7", cursorVisible: "true",
+      cursorShape: "bar", cursorBlinking: "true",
+      cursorAnimationIntervalMs: "750", cursorAnimationPhase: "off",
+      cursorActive: "false",
+    });
+    phase = "on";
+    ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 10 });
+    await vi.waitFor(() => expect(screen.dataset.cursorAnimationPhase).toBe("on"));
+    expect(screen.dataset.cursorActive).toBe("true");
+    expect(changed).toHaveBeenCalled();
+    input.blur();
+    expect(screen.dataset.cursorActive).toBe("false");
+    subscription.dispose();
+    presenter.dispose();
+    container.remove();
+  });
+
   it("owns its labels for pointer input while the pane lives", async () => {
     const { app, providers } = fakeApp();
     const container = document.createElement("div");
