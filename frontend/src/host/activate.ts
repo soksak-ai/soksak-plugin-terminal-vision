@@ -15,6 +15,10 @@ export const ENGINES = ["alacritty", "ghostty", "kitty", "shitty", "vt100", "wez
 interface TerminalHostEvents {
   on(event: "layout.reflow", callback: () => void): { dispose(): void };
   on(event: "window.gone", callback: (payload: { windowLabel?: string }) => void): { dispose(): void };
+  on(event: "paths.dropped", callback: (payload: {
+    paneId: string | null;
+    grants: Array<{ id: string; kind: "file" | "image" }>;
+  }) => void): { dispose(): void };
   on(event: "terminal-surface.state", callback: (payload: { pane: string; sequence: number }) => void): { dispose(): void };
 }
 

@@ -20,12 +20,13 @@
     "secrets",
     "terminal",
     "surface",
+    "clipboard:read",
     "clipboard:write"
   ],
   "implements": [
     {
       "id": "soksak-spec-plugin-terminal",
-      "version": "0.0.10"
+      "version": "0.0.13"
     }
   ],
   "contributes": {
@@ -194,6 +195,29 @@
         }
       },
       {
+        "name": "copy",
+        "title": {
+          "en": "Copy the selection",
+          "ko": "선택 복사"
+        }
+      },
+      {
+        "name": "paste",
+        "title": {
+          "en": "Paste terminal input",
+          "ko": "터미널 입력 붙여넣기"
+        },
+        "danger": "inject"
+      },
+      {
+        "name": "drop",
+        "title": {
+          "en": "Drop files or images",
+          "ko": "파일·이미지 드롭"
+        },
+        "danger": "inject"
+      },
+      {
         "name": "input.compose",
         "title": {
           "en": "Compose input text",
@@ -245,6 +269,9 @@
           "en": "The terminal input",
           "ko": "터미널 입력"
         }
+      },
+      {
+        "id": "terminal-drop-target"
       },
       {
         "id": "terminal-restore-status",
@@ -341,27 +368,27 @@
       },
       {
         "id": "soksak-sidecar-terminal-alacritty",
-        "version": "0.0.21"
+        "version": "0.0.23"
       },
       {
         "id": "soksak-sidecar-terminal-ghostty",
-        "version": "0.0.21"
+        "version": "0.0.23"
       },
       {
         "id": "soksak-sidecar-terminal-kitty",
-        "version": "0.0.17"
+        "version": "0.0.19"
       },
       {
         "id": "soksak-sidecar-terminal-shitty",
-        "version": "0.0.16"
+        "version": "0.0.18"
       },
       {
         "id": "soksak-sidecar-terminal-vt100",
-        "version": "0.0.20"
+        "version": "0.0.22"
       },
       {
         "id": "soksak-sidecar-terminal-wezterm",
-        "version": "0.0.20"
+        "version": "0.0.22"
       }
     ]
   }
