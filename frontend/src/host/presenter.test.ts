@@ -266,9 +266,11 @@ describe("the vision surface presenter", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(providers).toHaveLength(1);
     expect(providers[0].owns("terminal.win-test.tab-a-1")).toBe(true);
+    expect(providers[0].labelOfView?.("tab-a")).toBe("terminal.win-test.tab-a-1");
     expect(providers[0].owns("terminal.win-test.tab-zz-9")).toBe(false);
     presenter.dispose();
     expect(providers[0].owns("terminal.win-test.tab-a-1")).toBe(false);
+    expect(providers[0].labelOfView?.("tab-a")).toBeNull();
   });
 
   it("focuses the terminal input on native pointer down before the next typed key", async () => {
