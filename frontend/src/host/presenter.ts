@@ -412,6 +412,14 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         }
       };
       let surfaceStateReady = false;
+      let settleSurfaceReady!: (ready: boolean) => void;
+      let surfaceReadySettled = false;
+      const surfaceReady = new Promise<boolean>((resolve) => { settleSurfaceReady = resolve; });
+      const settleReadiness = (ready: boolean) => {
+        if (surfaceReadySettled) return;
+        surfaceReadySettled = true;
+        settleSurfaceReady(ready);
+      };
       stateDoors.set(pane, (payload) => {
         const observation = logOf(label);
         observation.stateEvents += 1;
@@ -425,6 +433,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           observation.lastError = null;
           ingest(reply);
           surfaceStateReady = true;
+          settleReadiness(true);
           screen.dataset.surfaceReady = "true";
         }).catch((error) => {
           observation.stateFailures += 1;
@@ -462,7 +471,12 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           void deliver({ verb: "resize", pixelW: next.width, pixelH: next.height, scale })
             .catch(() => {});
         },
-        sendText: (data) => deliver({ verb: "input", data }).then(() => undefined),
+        sendText: async (data) => {
+          if (!surfaceStateReady && !await surfaceReady) {
+            throw new Error(`terminal surface ${pane} was disposed before it became ready`);
+          }
+          await deliver({ verb: "input", data });
+        },
         renderedOutputSequence: () => state.sequence,
         themeStatus: () => cloneTerminalThemeStatus(state.theme),
         async setTheme(next) {
@@ -561,6 +575,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         dispose() {
           if (disposed) return;
           disposed = true;
+          settleReadiness(false);
           stateDoors.delete(pane);
           stateEventListeners.clear();
           live.delete(label);

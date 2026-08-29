@@ -89,6 +89,7 @@ describe("the vision surface presenter", () => {
     const container = document.createElement("div");
     const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
     await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 1 })).toBe(true);
     await presenter.sendText!("ls\r");
     presenter.read(4);
     presenter.focus();
@@ -98,7 +99,7 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
     await Promise.resolve();
     const verbs = delivered.map((entry) => entry.message.verb);
-    expect(delivered[0]).toEqual({
+    expect(delivered.find((entry) => entry.message.verb === "input")).toEqual({
       label: "terminal.win-test.tab-a-1",
       message: { verb: "input", data: "ls\r" },
     });
@@ -176,6 +177,30 @@ describe("the vision surface presenter", () => {
     expect(ingestTerminalSurfaceState({ pane: "tab-ready.1", sequence: 1 })).toBe(true);
     await expect(waiting).resolves.toBe("READY");
     expect(reads).toBe(1);
+    presenter.dispose();
+  });
+
+  it("holds input until the first native surface state event", async () => {
+    const inputs: string[] = [];
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => {
+          if (message.verb === "state") return { sequence: 1, cols: 80, rows: 24 };
+          if (message.verb === "input") inputs.push(String(message.data));
+          return {};
+        },
+      },
+    });
+    const presenter = createVisionRenderer(app).create(
+      document.createElement("div"), "tab-input-ready.1", () => {}, options,
+    );
+    const sent = presenter.sendText!("typed-before-ready");
+    await Promise.resolve();
+    expect(inputs).toEqual([]);
+    expect(ingestTerminalSurfaceState({ pane: "tab-input-ready.1", sequence: 1 })).toBe(true);
+    await sent;
+    expect(inputs).toEqual(["typed-before-ready"]);
     presenter.dispose();
   });
 
