@@ -27,6 +27,7 @@ function fakeApp(overrides: Partial<SurfaceApp> = {}) {
       deliver: async (label, message) => {
         delivered.push({ label, message });
         if (message.verb === "read") return { text: "ready\n$ " };
+        if (message.verb === "selection") return { text: "" };
         if (message.verb === "state") return { sequence: 3, cols: 80, rows: 24 };
         return {};
       },
@@ -95,7 +96,7 @@ describe("the vision surface presenter", () => {
     presenter.focus();
     presenter.scrollTo!(5);
     presenter.scrollLines!(-3);
-    presenter.selection!();
+    await presenter.selection!();
     presenter.dispose();
     await Promise.resolve();
     const verbs = delivered.map((entry) => entry.message.verb);

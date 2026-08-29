@@ -36,6 +36,9 @@ A pane adds no process. The web content process is not on the hot path.
    to `data-native-visible`. Core workspace, tab and overlay presentation stays on the host
    ancestor; it is never duplicated into the Plugin declaration. Effective visibility controls
    render work, while host dim controls native alpha.
+9. Native selection is asynchronous. The presenter returns only the resolved `surface.selection`
+   text and propagates a named refusal; it never returns cached empty text while an IPC request is
+   still running.
 
 The `shownlog` diagnostic command reports the count and last payload of surface frame events,
 successful state reads and failed reads per pane. A failed state delivery is recorded by name; it
