@@ -38,6 +38,9 @@ pane 은 프로세스를 더하지 않는다. 웹 콘텐츠 프로세스는 뜨�
    결정한다.
 9. Native selection은 비동기입니다. Presenter는 resolve된 `surface.selection` text만 반환하고 이름
    있는 거부를 전파합니다. IPC 요청이 진행 중인데 cache된 빈 text를 먼저 반환하지 않습니다.
+10. Pointer drag는 engine grid와 현재 surface rectangle로 정확한 cell/side gesture를 만듭니다. 요청은
+    gesture id 하나 아래에서 직렬화합니다. Engine mouse tracking이 활성일 때 modifier 없는 pointer
+    input을 빼앗지 않고 Shift가 local selection을 강제합니다.
 
 `shownlog` 진단 명령은 pane별 surface frame event, 성공한 state read, 실패한 read의 횟수와
 마지막 payload를 보고한다. state 전달 실패는 이름과 함께 기록하며 timer나 retry loop로 대체하지

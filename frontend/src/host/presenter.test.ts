@@ -27,7 +27,10 @@ function fakeApp(overrides: Partial<SurfaceApp> = {}) {
       deliver: async (label, message) => {
         delivered.push({ label, message });
         if (message.verb === "read") return { text: "ready\n$ " };
-        if (message.verb === "selection") return { text: "" };
+        if (message.verb === "selection") return {
+          active: false, text: "", kind: null, anchor: null, focus: null,
+          gestureId: null, sequence: 0,
+        };
         if (message.verb === "state") return { sequence: 3, cols: 80, rows: 24 };
         return {};
       },
@@ -126,7 +129,11 @@ describe("the vision surface presenter", () => {
       surface: {
         label: (kind, viewId) => `${kind}.win-test.${viewId}`,
         deliver: async (_label, message) => message.verb === "selection"
-          ? { text: "native selection" }
+          ? {
+              active: true, text: "native selection", kind: "simple", gestureId: "sel-1",
+              anchor: { row: 0, col: 0, side: "left" },
+              focus: { row: 0, col: 5, side: "right" }, sequence: 1,
+            }
           : {},
       },
     });
@@ -418,6 +425,74 @@ describe("the vision surface presenter", () => {
     expect(document.activeElement).toBe(input);
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "a", cancelable: true }));
     expect(send).toHaveBeenCalledWith("a");
+    presenter.dispose();
+    container.remove();
+  });
+
+  it("serializes an ungrabbed pointer drag into exact cell selection gestures", async () => {
+    const messages: Record<string, unknown>[] = [];
+    let selectionSequence = 0;
+    let grabbed = false;
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => {
+          messages.push(message);
+          if (message.verb === "state") return {
+            sequence: 1, cols: 10, rows: 5,
+            modes: {
+              mouseClick: grabbed, mouseDrag: grabbed, mouseMotion: false,
+              sgrMouse: false, utf8Mouse: false, alternateScroll: false,
+            },
+          };
+          if (message.verb === "selection") {
+            selectionSequence += 1;
+            return {
+              active: true, text: "dragged", kind: "simple", gestureId: message.gestureId,
+              anchor: message.point, focus: message.point, sequence: selectionSequence,
+            };
+          }
+          return {};
+        },
+      },
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const presenter = createVisionRenderer(app).create(container, "tab-drag.1", () => {}, options);
+    const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
+    screen.getBoundingClientRect = () => ({
+      x: 0, y: 0, left: 0, top: 0, right: 100, bottom: 50,
+      width: 100, height: 50, toJSON: () => ({}),
+    });
+    expect(ingestTerminalSurfaceState({ pane: "tab-drag.1", sequence: 1 })).toBe(true);
+    await vi.waitFor(() => expect(screen.dataset.surfaceReady).toBe("true"));
+    const fire = (type: string, x: number, buttons: number, shiftKey = false) => screen.dispatchEvent(new MouseEvent(type, {
+      clientX: x, clientY: 15, button: 0, buttons, detail: 1, shiftKey, bubbles: true, cancelable: true,
+    }));
+    fire("pointerdown", 15, 1);
+    fire("pointermove", 45, 1);
+    fire("pointerup", 45, 0);
+    await vi.waitFor(() => expect(messages.filter((message) => message.verb === "selection")).toHaveLength(3));
+    const selection = messages.filter((message) => message.verb === "selection");
+    expect(selection.map((message) => message.phase)).toEqual(["begin", "update", "end"]);
+    expect(selection.map((message) => message.point)).toEqual([
+      { row: 1, col: 1, side: "right" },
+      { row: 1, col: 4, side: "right" },
+      { row: 1, col: 4, side: "right" },
+    ]);
+    expect(new Set(selection.map((message) => message.gestureId)).size).toBe(1);
+
+    grabbed = true;
+    expect(ingestTerminalSurfaceState({ pane: "tab-drag.1", sequence: 2 })).toBe(true);
+    await vi.waitFor(() => expect(screen.dataset.mouseTracking).toBe("true"));
+    messages.length = 0;
+    fire("pointerdown", 15, 1);
+    fire("pointerup", 45, 0);
+    await Promise.resolve();
+    expect(messages.filter((message) => message.verb === "selection")).toHaveLength(0);
+    fire("pointerdown", 15, 1, true);
+    fire("pointerup", 45, 0, true);
+    await vi.waitFor(() => expect(messages.filter((message) => message.verb === "selection")).toHaveLength(2));
     presenter.dispose();
     container.remove();
   });

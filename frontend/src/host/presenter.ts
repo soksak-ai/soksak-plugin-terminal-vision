@@ -68,7 +68,8 @@ interface SurfaceState {
   offset: number;
   historySize: number;
   text: string;
-  selection: string;
+  selection: SurfaceSelectionSnapshot;
+  modes: SurfaceModes | null;
   cursorRow: number;
   cursorColumn: number;
   cursorVisible: boolean;
@@ -77,6 +78,35 @@ interface SurfaceState {
   cursorAnimation: { intervalMs: number; phase: "steady" | "on" | "off" };
   theme: TerminalThemeStatus;
 }
+
+interface SurfaceModes {
+  mouseClick: boolean;
+  mouseDrag: boolean;
+  mouseMotion: boolean;
+  sgrMouse: boolean;
+  utf8Mouse: boolean;
+  alternateScroll: boolean;
+}
+
+interface SurfaceSelectionPoint {
+  row: number;
+  col: number;
+  side: "left" | "right";
+}
+
+interface SurfaceSelectionSnapshot {
+  active: boolean;
+  text: string;
+  kind: "simple" | "block" | "semantic" | "line" | "extend" | null;
+  anchor: SurfaceSelectionPoint | null;
+  focus: SurfaceSelectionPoint | null;
+  gestureId: string | null;
+  sequence: number;
+}
+
+const emptySelection = (): SurfaceSelectionSnapshot => ({
+  active: false, text: "", kind: null, anchor: null, focus: null, gestureId: null, sequence: 0,
+});
 
 function cloneTerminalThemeStatus(status: TerminalThemeStatus): TerminalThemeStatus {
   return {
@@ -112,6 +142,49 @@ function terminalThemeStatus(value: Record<string, unknown>): TerminalThemeStatu
   } catch {
     return null;
   }
+}
+
+function surfaceModes(value: unknown): SurfaceModes | null {
+  if (!value || typeof value !== "object") return null;
+  const mode = value as Record<string, unknown>;
+  for (const key of ["mouseClick", "mouseDrag", "mouseMotion", "sgrMouse", "utf8Mouse", "alternateScroll"]) {
+    if (typeof mode[key] !== "boolean") return null;
+  }
+  return mode as unknown as SurfaceModes;
+}
+
+function surfaceSelectionPoint(value: unknown): SurfaceSelectionPoint | null {
+  if (!value || typeof value !== "object") return null;
+  const point = value as Record<string, unknown>;
+  if (!Number.isSafeInteger(point.row) || Number(point.row) < 0
+    || !Number.isSafeInteger(point.col) || Number(point.col) < 0
+    || (point.side !== "left" && point.side !== "right")) return null;
+  return { row: Number(point.row), col: Number(point.col), side: point.side };
+}
+
+function surfaceSelectionSnapshot(value: unknown): SurfaceSelectionSnapshot | null {
+  if (!value || typeof value !== "object") return null;
+  const snapshot = value as Record<string, unknown>;
+  if (typeof snapshot.active !== "boolean" || typeof snapshot.text !== "string"
+    || !Number.isSafeInteger(snapshot.sequence) || Number(snapshot.sequence) < 0) return null;
+  if (!snapshot.active) {
+    if (snapshot.text !== "" || snapshot.kind !== null || snapshot.anchor !== null
+      || snapshot.focus !== null || snapshot.gestureId !== null) return null;
+    return emptySelectionWithSequence(Number(snapshot.sequence));
+  }
+  if (snapshot.kind !== "simple" && snapshot.kind !== "block" && snapshot.kind !== "semantic"
+    && snapshot.kind !== "line" && snapshot.kind !== "extend") return null;
+  const anchor = surfaceSelectionPoint(snapshot.anchor);
+  const focus = surfaceSelectionPoint(snapshot.focus);
+  if (!anchor || !focus || typeof snapshot.gestureId !== "string" || snapshot.gestureId === "") return null;
+  return {
+    active: true, text: snapshot.text, kind: snapshot.kind,
+    anchor, focus, gestureId: snapshot.gestureId, sequence: Number(snapshot.sequence),
+  };
+}
+
+function emptySelectionWithSequence(sequence: number): SurfaceSelectionSnapshot {
+  return { ...emptySelection(), sequence };
 }
 
 interface PresenterObservation {
@@ -207,7 +280,6 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           focusInputByLabel.get(label)?.();
           await surface.deliver(label, { verb: "focus" });
         }
-        await surface.deliver(label, { verb: "input", pointer: input as unknown as Record<string, unknown> });
       },
       inputState: (label, at) => surface.deliver(label, { verb: "state", ...(at ? { at } : {}) }),
     });
@@ -332,17 +404,11 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       container.append(screen, input);
       live.add(label);
       labelByView.set(pane.slice(0, pane.lastIndexOf(".")), label);
-      // The native layer passes clicks through; the container is what the
-      // click lands on, and the hidden textarea is where keys must go.
-      const onMousedown = () => {
-        input.focus();
-        void deliver({ verb: "focus" }).catch(() => {});
-      };
       focusInputByLabel.set(label, () => input.focus());
-      container.addEventListener("mousedown", onMousedown);
 
       const state: SurfaceState = {
-        sequence: null, cols: 0, rows: 0, offset: 0, historySize: 0, text: "", selection: "",
+        sequence: null, cols: 0, rows: 0, offset: 0, historySize: 0, text: "",
+        selection: emptySelection(), modes: null,
         cursorRow: 0, cursorColumn: 0, cursorVisible: false, cursorShape: "block",
         cursorBlinking: false, cursorAnimation: { intervalMs: 0, phase: "steady" },
         theme: initialThemeStatus,
@@ -365,6 +431,21 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       input.addEventListener("focus", onInputFocus);
       input.addEventListener("blur", onInputFocus);
       syncCursorPresentation();
+      const adoptSelection = (value: unknown): SurfaceSelectionSnapshot | null => {
+        const next = surfaceSelectionSnapshot(value);
+        if (!next || next.sequence < state.selection.sequence) return null;
+        state.selection = next;
+        screen.dataset.selectionActive = String(next.active);
+        screen.dataset.selectionText = next.text;
+        screen.dataset.selectionSequence = String(next.sequence);
+        if (next.kind) screen.dataset.selectionKind = next.kind;
+        else delete screen.dataset.selectionKind;
+        if (next.gestureId) screen.dataset.selectionGestureId = next.gestureId;
+        else delete screen.dataset.selectionGestureId;
+        delete screen.dataset.selectionError;
+        return next;
+      };
+      adoptSelection(state.selection);
       const ingest = (payload: Record<string, unknown>) => {
         if (typeof payload.sequence === "number") state.sequence = Math.max(state.sequence ?? 0, payload.sequence);
         if (typeof payload.cols === "number") state.cols = payload.cols;
@@ -372,6 +453,15 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         if (typeof payload.offset === "number") state.offset = payload.offset;
         if (typeof payload.historySize === "number") state.historySize = payload.historySize;
         if (typeof payload.text === "string") state.text = payload.text;
+        const nextModes = surfaceModes(payload.modes);
+        if (nextModes) {
+          state.modes = nextModes;
+          screen.dataset.mouseTracking = String(
+            nextModes.mouseClick || nextModes.mouseDrag || nextModes.mouseMotion,
+          );
+          screen.dataset.alternateScroll = String(nextModes.alternateScroll);
+        }
+        adoptSelection(payload.selection);
         let presentationChanged = false;
         const setCursorNumber = (key: "cursorRow" | "cursorColumn", value: unknown) => {
           if (!Number.isSafeInteger(value) || Number(value) < 0 || state[key] === Number(value)) return;
@@ -417,6 +507,98 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           for (const listener of presentationListeners) listener();
         }
       };
+      type GestureKind = "simple" | "block" | "semantic" | "line" | "extend";
+      let activeGesture: { id: string; kind: GestureKind; pointerId: number | null } | null = null;
+      let selectionQueue = Promise.resolve();
+      const selectionPoint = (event: PointerEvent): SurfaceSelectionPoint | null => {
+        if (state.cols < 1 || state.rows < 1) return null;
+        const rect = screen.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return null;
+        const x = Math.max(0, Math.min(rect.width - Number.EPSILON, event.clientX - rect.left));
+        const y = Math.max(0, Math.min(rect.height - Number.EPSILON, event.clientY - rect.top));
+        const columnValue = x / rect.width * state.cols;
+        return {
+          row: Math.min(state.rows - 1, Math.floor(y / rect.height * state.rows)),
+          col: Math.min(state.cols - 1, Math.floor(columnValue)),
+          side: columnValue - Math.floor(columnValue) < 0.5 ? "left" : "right",
+        };
+      };
+      const modifiers = (event: PointerEvent) => ({
+        shift: event.shiftKey, alt: event.altKey, control: event.ctrlKey, meta: event.metaKey,
+      });
+      const enqueueSelection = (message: Record<string, unknown>) => {
+        selectionQueue = selectionQueue
+          .catch(() => {})
+          .then(async () => {
+            const reply = await deliver({ verb: "selection", ...message });
+            if (!adoptSelection(reply)) throw new Error("surface.selection returned no valid snapshot");
+          })
+          .catch((error) => {
+            screen.dataset.selectionError = String(error);
+          });
+      };
+      const localSelection = (event: PointerEvent) => {
+        const grabbed = state.modes !== null
+          && (state.modes.mouseClick || state.modes.mouseDrag || state.modes.mouseMotion);
+        return event.shiftKey || (state.modes !== null && !grabbed);
+      };
+      const kindOf = (event: PointerEvent): GestureKind => {
+        if (event.ctrlKey && event.altKey) return "block";
+        if (event.detail >= 3) return "line";
+        if (event.detail === 2) return "semantic";
+        return "simple";
+      };
+      const onPointerDown = (event: PointerEvent) => {
+        if (event.button !== 0) return;
+        input.focus();
+        void deliver({ verb: "focus" }).catch(() => {});
+        if (!localSelection(event)) return;
+        const point = selectionPoint(event);
+        if (!point) return;
+        event.preventDefault();
+        const id = crypto.randomUUID();
+        activeGesture = {
+          id, kind: kindOf(event), pointerId: Number.isSafeInteger(event.pointerId) ? event.pointerId : null,
+        };
+        if (activeGesture.pointerId !== null) {
+          try { screen.setPointerCapture?.(activeGesture.pointerId); } catch { /* detached test node */ }
+        }
+        enqueueSelection({
+          action: "gesture", gestureId: id, phase: "begin", kind: activeGesture.kind,
+          point, modifiers: modifiers(event),
+        });
+      };
+      const onPointerMove = (event: PointerEvent) => {
+        if (!activeGesture || (event.buttons & 1) === 0) return;
+        const point = selectionPoint(event);
+        if (!point) return;
+        event.preventDefault();
+        enqueueSelection({
+          action: "gesture", gestureId: activeGesture.id, phase: "update", kind: activeGesture.kind,
+          point, modifiers: modifiers(event),
+        });
+      };
+      const onPointerUp = (event: PointerEvent) => {
+        if (!activeGesture || event.button !== 0) return;
+        const gesture = activeGesture;
+        activeGesture = null;
+        const point = selectionPoint(event);
+        if (!point) return;
+        event.preventDefault();
+        enqueueSelection({
+          action: "gesture", gestureId: gesture.id, phase: "end", kind: gesture.kind,
+          point, modifiers: modifiers(event),
+        });
+      };
+      const onPointerCancel = () => {
+        if (!activeGesture) return;
+        activeGesture = null;
+        enqueueSelection({ action: "clear" });
+      };
+      screen.addEventListener("pointerdown", onPointerDown);
+      screen.addEventListener("pointermove", onPointerMove);
+      screen.addEventListener("pointerup", onPointerUp);
+      screen.addEventListener("pointercancel", onPointerCancel);
       let surfaceStateReady = false;
       let settleSurfaceReady!: (ready: boolean) => void;
       let surfaceReadySettled = false;
@@ -501,12 +683,11 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         },
         read: readText,
         async selection() {
-          const reply = await deliver({ verb: "selection" });
-          if (typeof reply.text !== "string") {
-            throw new Error("surface.selection returned no text");
-          }
-          state.selection = reply.text;
-          return state.selection;
+          await selectionQueue;
+          const reply = await deliver({ verb: "selection", action: "read" });
+          const selection = adoptSelection(reply);
+          if (!selection) throw new Error("surface.selection returned no valid snapshot");
+          return selection.text;
         },
         async waitForText(contains, timeoutMs) {
           return new Promise<string>((resolve, reject) => {
@@ -601,7 +782,10 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           input.removeEventListener("paste", onPaste);
           input.removeEventListener("focus", onInputFocus);
           input.removeEventListener("blur", onInputFocus);
-          container.removeEventListener("mousedown", onMousedown);
+          screen.removeEventListener("pointerdown", onPointerDown);
+          screen.removeEventListener("pointermove", onPointerMove);
+          screen.removeEventListener("pointerup", onPointerUp);
+          screen.removeEventListener("pointercancel", onPointerCancel);
           presentationListeners.clear();
           screen.remove();
           input.remove();
