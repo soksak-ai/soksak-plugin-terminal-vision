@@ -271,6 +271,25 @@ describe("the vision surface presenter", () => {
     expect(providers[0].owns("terminal.win-test.tab-a-1")).toBe(false);
   });
 
+  it("focuses the terminal input on native pointer down before the next typed key", async () => {
+    const send = vi.fn();
+    const { app, providers } = fakeApp();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const presenter = createVisionRenderer(app).create(container, "tab-a.1", send, options);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const input = container.querySelector("textarea")!;
+    expect(document.activeElement).not.toBe(input);
+    await providers[0].sendInput("terminal.win-test.tab-a-1", {
+      x: 10, y: 12, kind: "down", button: "left", clickCount: 1,
+    });
+    expect(document.activeElement).toBe(input);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "a", cancelable: true }));
+    expect(send).toHaveBeenCalledWith("a");
+    presenter.dispose();
+    container.remove();
+  });
+
   it("routes typed keys to the pane and leaves shortcuts alone", async () => {
     const send = vi.fn();
     const { app } = fakeApp();
