@@ -16,6 +16,10 @@ presentation remains on the host ancestor and is never copied into the Plugin de
 dim changes only native alpha. The Kit supplies all four observable facts—intrinsic, host,
 effective, and dim—through one `TerminalVisibilityState` update.
 
+Native `read` and `selection` replies are asynchronous presenter results. The Plugin returns the
+resolved engine text or propagates the refusal; it never reports a cached empty success while an
+IPC request is still in flight.
+
 ## Verification
 
 ```sh
