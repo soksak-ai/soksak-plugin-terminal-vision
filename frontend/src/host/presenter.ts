@@ -411,6 +411,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           for (const listener of presentationListeners) listener();
         }
       };
+      let surfaceStateReady = false;
       stateDoors.set(pane, (payload) => {
         const observation = logOf(label);
         observation.stateEvents += 1;
@@ -423,6 +424,8 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           observation.lastRead = { ...reply };
           observation.lastError = null;
           ingest(reply);
+          surfaceStateReady = true;
+          screen.dataset.surfaceReady = "true";
         }).catch((error) => {
           observation.stateFailures += 1;
           observation.lastError = String(error);
@@ -518,12 +521,12 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
                 if (pending && !settled) { pending = false; void check(); }
               }
             };
-            const onState = () => { void check(); };
+            const onState = () => { if (surfaceStateReady) void check(); };
             const deadline = setTimeout(() => {
               fail(new Error(`TIMEOUT: ${JSON.stringify(contains)} did not appear within ${timeoutMs}ms`));
             }, Math.max(0, timeoutMs));
             stateEventListeners.add(onState);
-            void check();
+            if (surfaceStateReady) void check();
           });
         },
         focus() {

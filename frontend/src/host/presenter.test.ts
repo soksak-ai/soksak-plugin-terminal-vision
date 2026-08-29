@@ -139,11 +139,43 @@ describe("the vision surface presenter", () => {
     await Promise.resolve();
     await Promise.resolve();
     await new Promise((resolve) => setTimeout(resolve, 250));
-    expect(reads).toBe(1);
+    expect(reads).toBe(0);
     text = "READY";
     expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 2 })).toBe(true);
     await expect(waiting).resolves.toBe("READY");
-    expect(reads).toBe(2);
+    expect(reads).toBe(1);
+    presenter.dispose();
+  });
+
+  it("does not read before the first native surface state event", async () => {
+    let ready = false;
+    let reads = 0;
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => {
+          if (message.verb === "state") {
+            ready = true;
+            return { sequence: 1, cols: 80, rows: 24 };
+          }
+          if (message.verb === "read") {
+            reads += 1;
+            if (!ready) throw new Error("NOT_FOUND: surface is not open yet");
+            return { text: "READY" };
+          }
+          return {};
+        },
+      },
+    });
+    const presenter = createVisionRenderer(app).create(
+      document.createElement("div"), "tab-ready.1", () => {}, options,
+    );
+    const waiting = presenter.waitForText("READY", 1000);
+    await Promise.resolve();
+    expect(reads).toBe(0);
+    expect(ingestTerminalSurfaceState({ pane: "tab-ready.1", sequence: 1 })).toBe(true);
+    await expect(waiting).resolves.toBe("READY");
+    expect(reads).toBe(1);
     presenter.dispose();
   });
 
