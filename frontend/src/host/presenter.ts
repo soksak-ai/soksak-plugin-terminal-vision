@@ -32,8 +32,9 @@ export interface SurfacePointerInput {
   x: number;
   y: number;
   kind: "down" | "up" | "move" | "drag" | "enter" | "exit";
-  button: "left" | "right";
+  button: "left" | "middle" | "right";
   clickCount: number;
+  modifiers: { shift: boolean; alt: boolean; control: boolean; meta: boolean };
 }
 
 export interface SurfaceWheelInput {

@@ -421,6 +421,7 @@ describe("the vision surface presenter", () => {
     expect(document.activeElement).not.toBe(input);
     await providers[0].sendInput("terminal.win-test.tab-a-1", {
       x: 10, y: 12, kind: "down", button: "left", clickCount: 1,
+      modifiers: { shift: false, alt: false, control: false, meta: false },
     });
     expect(document.activeElement).toBe(input);
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "a", cancelable: true }));
@@ -468,12 +469,15 @@ describe("the vision surface presenter", () => {
 
     await providers[0].sendInput("terminal.win-test.tab-native-drag-1", {
       x: 15, y: 15, kind: "down", button: "left", clickCount: 1,
+      modifiers: { shift: false, alt: false, control: false, meta: false },
     });
     await providers[0].sendInput("terminal.win-test.tab-native-drag-1", {
-      x: 45, y: 15, kind: "drag", button: "left", clickCount: 1,
+      x: 45, y: 15, kind: "drag", button: "left", clickCount: 0,
+      modifiers: { shift: false, alt: false, control: false, meta: false },
     });
     await providers[0].sendInput("terminal.win-test.tab-native-drag-1", {
       x: 45, y: 15, kind: "up", button: "left", clickCount: 1,
+      modifiers: { shift: false, alt: false, control: false, meta: false },
     });
     await vi.waitFor(() => expect(messages.filter((message) => message.verb === "selection")).toHaveLength(3));
     const selection = messages.filter((message) => message.verb === "selection");
@@ -538,7 +542,7 @@ describe("the vision surface presenter", () => {
     const messages: Record<string, unknown>[] = [];
     let selectionSequence = 0;
     let grabbed = false;
-    const { app } = fakeApp({
+    const { app, providers } = fakeApp({
       surface: {
         label: (kind, viewId) => `${kind}.win-test.${viewId}`,
         deliver: async (_label, message) => {
@@ -595,6 +599,21 @@ describe("the vision surface presenter", () => {
     fire("pointerup", 45, 0);
     await Promise.resolve();
     expect(messages.filter((message) => message.verb === "selection")).toHaveLength(0);
+    await providers[0].sendInput("terminal.win-test.tab-drag-1", {
+      x: 15, y: 15, kind: "down", button: "left", clickCount: 1,
+      modifiers: { shift: false, alt: false, control: false, meta: false },
+    });
+    await providers[0].sendInput("terminal.win-test.tab-drag-1", {
+      x: 45, y: 15, kind: "drag", button: "left", clickCount: 0,
+      modifiers: { shift: false, alt: false, control: false, meta: false },
+    });
+    await providers[0].sendInput("terminal.win-test.tab-drag-1", {
+      x: 45, y: 15, kind: "up", button: "left", clickCount: 1,
+      modifiers: { shift: false, alt: false, control: false, meta: false },
+    });
+    await vi.waitFor(() => expect(messages.filter((message) => message.verb === "pointer")).toHaveLength(3));
+    expect(messages.filter((message) => message.verb === "pointer").map((message) => message.phase))
+      .toEqual(["down", "move", "up"]);
     fire("pointerdown", 15, 1, true);
     fire("pointerup", 45, 0, true);
     await vi.waitFor(() => expect(messages.filter((message) => message.verb === "selection")).toHaveLength(2));
