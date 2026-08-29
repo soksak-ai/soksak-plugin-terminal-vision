@@ -279,6 +279,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
   const labelByView = new Map<string, string>();
   const focusInputByLabel = new Map<string, () => void>();
   const pointerInputByLabel = new Map<string, (input: SurfacePointerInput) => Promise<void>>();
+  const wheelInputByLabel = new Map<string, (input: SurfaceWheelInput) => Promise<void>>();
   let pointerRegistered = false;
   const registerPointerProvider = (surface: SurfaceCapability) => {
     if (pointerRegistered || !app.provideSurfaceInput) return;
@@ -295,8 +296,10 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         if (!route) throw new Error(`terminal surface ${label} has no live pointer route`);
         await route(input);
       },
-      sendWheel: async () => {
-        throw new Error("WHEEL_INPUT_UNIMPLEMENTED");
+      sendWheel: async (label, input) => {
+        const route = wheelInputByLabel.get(label);
+        if (!route) throw new Error(`terminal surface ${label} has no live wheel route`);
+        await route(input);
       },
       inputState: (label, at) => surface.deliver(label, { verb: "state", ...(at ? { at } : {}) }),
     });
@@ -652,10 +655,60 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           });
         }
       });
+      let wheelSequence = 0;
+      let wheelQueue = Promise.resolve();
+      const enqueueWheel = (event: SurfaceWheelInput): Promise<void> => {
+        const running = wheelQueue
+          .catch(() => {})
+          .then(async () => {
+            const reply = await deliver({
+              verb: "wheel", point: { x: event.x, y: event.y },
+              deltaX: event.deltaX, deltaY: event.deltaY, deltaMode: event.deltaMode,
+              modifiers: event.modifiers,
+            });
+            const route = reply.route;
+            if (route !== "scrollback" && route !== "mouse-report"
+              && route !== "alternate-scroll" && route !== "ignored") {
+              throw new Error("surface.wheel returned no valid route");
+            }
+            const written = Number(reply.written);
+            if (!Number.isSafeInteger(written) || written < 0) {
+              throw new Error("surface.wheel returned no valid written count");
+            }
+            ingest(reply);
+            wheelSequence += 1;
+            screen.dataset.wheelRoute = route;
+            screen.dataset.wheelWritten = String(written);
+            screen.dataset.wheelSequence = String(wheelSequence);
+            delete screen.dataset.wheelError;
+          });
+        wheelQueue = running.catch((error) => {
+          screen.dataset.wheelError = String(error);
+        });
+        return running;
+      };
+      wheelInputByLabel.set(label, enqueueWheel);
+      const onWheel = (event: WheelEvent) => {
+        if (event.deltaX === 0 && event.deltaY === 0) return;
+        const rect = screen.getBoundingClientRect();
+        event.preventDefault();
+        void enqueueWheel({
+          x: Math.max(0, event.clientX - rect.left),
+          y: Math.max(0, event.clientY - rect.top),
+          deltaX: event.deltaX,
+          deltaY: event.deltaY,
+          deltaMode: event.deltaMode === WheelEvent.DOM_DELTA_LINE
+            ? "line" : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? "page" : "pixel",
+          modifiers: {
+            shift: event.shiftKey, alt: event.altKey, control: event.ctrlKey, meta: event.metaKey,
+          },
+        }).catch(() => {});
+      };
       screen.addEventListener("pointerdown", onPointerDown);
       screen.addEventListener("pointermove", onPointerMove);
       screen.addEventListener("pointerup", onPointerUp);
       screen.addEventListener("pointercancel", onPointerCancel);
+      screen.addEventListener("wheel", onWheel, { passive: false });
       let surfaceStateReady = false;
       let settleSurfaceReady!: (ready: boolean) => void;
       let surfaceReadySettled = false;
@@ -835,6 +888,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           labelByView.delete(pane.slice(0, pane.lastIndexOf(".")));
           focusInputByLabel.delete(label);
           pointerInputByLabel.delete(label);
+          wheelInputByLabel.delete(label);
           input.removeEventListener("keydown", onKeydown);
           input.removeEventListener("compositionend", onCompositionEnd);
           input.removeEventListener("paste", onPaste);
@@ -844,6 +898,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           screen.removeEventListener("pointermove", onPointerMove);
           screen.removeEventListener("pointerup", onPointerUp);
           screen.removeEventListener("pointercancel", onPointerCancel);
+          screen.removeEventListener("wheel", onWheel);
           presentationListeners.clear();
           screen.remove();
           input.remove();

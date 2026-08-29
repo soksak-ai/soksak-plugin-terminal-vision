@@ -518,6 +518,19 @@ describe("the vision surface presenter", () => {
     });
     expect(screen.dataset.wheelRoute).toBe("scrollback");
     expect(screen.dataset.wheelSequence).toBe("1");
+    screen.getBoundingClientRect = () => ({
+      x: 5, y: 10, left: 5, top: 10, right: 105, bottom: 60,
+      width: 100, height: 50, toJSON: () => ({}),
+    });
+    screen.dispatchEvent(new WheelEvent("wheel", {
+      clientX: 17, clientY: 34, deltaX: 0, deltaY: 3, deltaMode: WheelEvent.DOM_DELTA_LINE,
+      ctrlKey: true, bubbles: true, cancelable: true,
+    }));
+    await vi.waitFor(() => expect(screen.dataset.wheelSequence).toBe("2"));
+    expect(messages.filter((message) => message.verb === "wheel").at(-1)).toEqual({
+      verb: "wheel", point: { x: 12, y: 24 }, deltaX: 0, deltaY: 3, deltaMode: "line",
+      modifiers: { shift: false, alt: false, control: true, meta: false },
+    });
     presenter.dispose();
   });
 

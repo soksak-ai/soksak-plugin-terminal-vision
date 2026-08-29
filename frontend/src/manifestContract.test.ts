@@ -11,8 +11,8 @@ describe("terminal plugin manifest contract", () => {
     expect(manifest.name).toEqual({ en: "Vision Terminal", ko: "Vision 터미널" });
     expect(manifest.version).toBe(pkg.version);
     expect(pkg.dependencies).toEqual({
-      "@soksak/soksak-contract-plugin-terminal": "0.0.15",
-      "@soksak/soksak-kit-plugin-terminal": "0.0.78",
+      "@soksak/soksak-contract-plugin-terminal": "0.0.16",
+      "@soksak/soksak-kit-plugin-terminal": "0.0.79",
     });
     expect(manifest).not.toHaveProperty("spec");
     expect(manifest.appVersionRequirement).toBe("0.0.1");
@@ -36,7 +36,7 @@ describe("terminal plugin manifest contract", () => {
     const engines = ["alacritty", "ghostty", "kitty", "shitty", "vt100", "wezterm"];
     expect(manifest.runtimeDependencies.sidecars).toEqual([
       { id: "soksak-sidecar-pty", version: "0.0.17" },
-      { id: "soksak-sidecar-terminal-alacritty", version: "0.0.35" },
+      { id: "soksak-sidecar-terminal-alacritty", version: "0.0.36" },
       { id: "soksak-sidecar-terminal-ghostty", version: "0.0.33" },
       { id: "soksak-sidecar-terminal-kitty", version: "0.0.29" },
       { id: "soksak-sidecar-terminal-shitty", version: "0.0.28" },
