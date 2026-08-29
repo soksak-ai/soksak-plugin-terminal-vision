@@ -32,6 +32,10 @@ A pane adds no process. The web content process is not on the hot path.
    `surface.theme` command. Only a complete `surface.state` reply becomes `themeStatus`; no
    unthemed fallback or polling path exists. Text waits subscribe to state events and use one
    deadline timeout only.
+8. Visibility has two owners. Workbench pane visibility is intrinsic and is the only value written
+   to `data-native-visible`. Core workspace, tab and overlay presentation stays on the host
+   ancestor; it is never duplicated into the Plugin declaration. Effective visibility controls
+   render work, while host dim controls native alpha.
 
 The `shownlog` diagnostic command reports the count and last payload of surface frame events,
 successful state reads and failed reads per pane. A failed state delivery is recorded by name; it

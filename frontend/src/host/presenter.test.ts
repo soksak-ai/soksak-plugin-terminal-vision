@@ -217,6 +217,31 @@ describe("the vision surface presenter", () => {
     expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 10 })).toBe(false);
   });
 
+  it("declares only intrinsic pane visibility and keeps host presentation on its separate axis", async () => {
+    const { app } = fakeApp();
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
+    const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
+    await vi.waitFor(() => expect(screen.dataset.nativeSurface).toBe("terminal"));
+    const setVisibility = (presenter as typeof presenter & {
+      setVisibility?(value: {
+        intrinsicVisible: boolean; hostVisible: boolean; effectiveVisible: boolean; dim: number;
+      }): void;
+    }).setVisibility;
+    expect(setVisibility).toBeTypeOf("function");
+
+    // Core hides the whole view through the ancestor. Repeating that false in this declaration
+    // would veto the compositor's pre-DOM target stage.
+    setVisibility?.({ intrinsicVisible: true, hostVisible: false, effectiveVisible: false, dim: 0.5 });
+    expect(screen.dataset.nativeVisible).toBe("true");
+    expect(screen.dataset.nativeAlpha).toBe("0.5");
+
+    // Workbench maximize is intrinsic: that pane's native member itself must be hidden.
+    setVisibility?.({ intrinsicVisible: false, hostVisible: true, effectiveVisible: false, dim: 0 });
+    expect(screen.dataset.nativeVisible).toBe("false");
+    presenter.dispose();
+  });
+
   it("publishes the engine cursor state through the terminal screen", async () => {
     shownLog.clear();
     let phase: "on" | "off" = "off";
