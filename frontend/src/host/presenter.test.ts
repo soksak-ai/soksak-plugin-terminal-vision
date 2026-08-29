@@ -429,6 +429,61 @@ describe("the vision surface presenter", () => {
     container.remove();
   });
 
+  it("routes the native surface drag through the same engine selection transaction", async () => {
+    const messages: Record<string, unknown>[] = [];
+    let selectionSequence = 0;
+    const { app, providers } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => {
+          messages.push(message);
+          if (message.verb === "state") return {
+            sequence: 1, cols: 10, rows: 5,
+            modes: {
+              mouseClick: false, mouseDrag: false, mouseMotion: false,
+              sgrMouse: false, utf8Mouse: false, alternateScroll: false,
+            },
+          };
+          if (message.verb === "selection") {
+            selectionSequence += 1;
+            return {
+              active: true, text: "native-dragged", kind: "simple", gestureId: message.gestureId,
+              anchor: message.point, focus: message.point, sequence: selectionSequence,
+            };
+          }
+          return {};
+        },
+      },
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const presenter = createVisionRenderer(app).create(container, "tab-native-drag.1", () => {}, options);
+    expect(ingestTerminalSurfaceState({ pane: "tab-native-drag.1", sequence: 1 })).toBe(true);
+    const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
+    await vi.waitFor(() => expect(screen.dataset.surfaceReady).toBe("true"));
+
+    await providers[0].sendInput("terminal.win-test.tab-native-drag-1", {
+      x: 15, y: 15, kind: "down", button: "left", clickCount: 1,
+    });
+    await providers[0].sendInput("terminal.win-test.tab-native-drag-1", {
+      x: 45, y: 15, kind: "drag", button: "left", clickCount: 1,
+    });
+    await providers[0].sendInput("terminal.win-test.tab-native-drag-1", {
+      x: 45, y: 15, kind: "up", button: "left", clickCount: 1,
+    });
+    await vi.waitFor(() => expect(messages.filter((message) => message.verb === "selection")).toHaveLength(3));
+    const selection = messages.filter((message) => message.verb === "selection");
+    expect(selection.map((message) => message.phase)).toEqual(["begin", "update", "end"]);
+    expect(selection.map((message) => message.point)).toEqual([
+      { row: 1, col: 1, side: "right" },
+      { row: 1, col: 4, side: "right" },
+      { row: 1, col: 4, side: "right" },
+    ]);
+    expect(new Set(selection.map((message) => message.gestureId)).size).toBe(1);
+    presenter.dispose();
+    container.remove();
+  });
+
   it("serializes an ungrabbed pointer drag into exact cell selection gestures", async () => {
     const messages: Record<string, unknown>[] = [];
     let selectionSequence = 0;
