@@ -500,10 +500,12 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           return { dispose: () => void presentationListeners.delete(callback) };
         },
         read: readText,
-        selection() {
-          void deliver({ verb: "selection" })
-            .then((reply) => { if (typeof reply.text === "string") state.selection = reply.text; })
-            .catch(() => {});
+        async selection() {
+          const reply = await deliver({ verb: "selection" });
+          if (typeof reply.text !== "string") {
+            throw new Error("surface.selection returned no text");
+          }
+          state.selection = reply.text;
           return state.selection;
         },
         async waitForText(contains, timeoutMs) {
