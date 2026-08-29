@@ -249,6 +249,38 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
+  it("accepts an engine theme by field values regardless of JSON property order", async () => {
+    const terminalOverrides = emptyTerminalThemeOverrides();
+    terminalOverrides.background = "#234567";
+    const baseTheme = {
+      foreground: "#eeeeee", background: "#111111", cursor: "#ffffff",
+      cursorAccent: "#111111", selectionBackground: "#555555",
+      ansi: [...TERMINAL_ANSI_PALETTE],
+    };
+    const expected = resolveTerminalTheme(baseTheme, terminalOverrides);
+    const reorderedEffective = {
+      ansi: expected.ansi, selectionBackground: expected.selectionBackground,
+      foreground: expected.foreground, cursorAccent: expected.cursorAccent,
+      background: expected.background, cursor: expected.cursor,
+    };
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => message.verb === "state" ? {
+          themeMode: "dark", baseTheme, terminalOverrides, effectiveTheme: reorderedEffective,
+        } : {},
+      },
+    });
+    const presenter = createVisionRenderer(app).create(
+      document.createElement("div"), "tab-order.1", () => {}, options,
+    ) as ReturnType<ReturnType<typeof createVisionRenderer>["create"]> & {
+      themeStatus(): { terminalOverrides: { background: string | null } };
+    };
+    expect(ingestTerminalSurfaceState({ pane: "tab-order.1", sequence: 1 })).toBe(true);
+    await vi.waitFor(() => expect(presenter.themeStatus().terminalOverrides.background).toBe("#234567"));
+    presenter.dispose();
+  });
+
   it("refuses an undeclared host theme mode instead of using a fallback", () => {
     const mode = document.documentElement.dataset.themeMode;
     delete document.documentElement.dataset.themeMode;
