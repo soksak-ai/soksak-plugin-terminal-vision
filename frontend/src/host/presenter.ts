@@ -36,12 +36,22 @@ export interface SurfacePointerInput {
   clickCount: number;
 }
 
+export interface SurfaceWheelInput {
+  x: number;
+  y: number;
+  deltaX: number;
+  deltaY: number;
+  deltaMode: "pixel" | "line" | "page";
+  modifiers: { shift: boolean; alt: boolean; control: boolean; meta: boolean };
+}
+
 export interface SurfaceApp {
   surface?: SurfaceCapability;
   provideSurfaceInput?(provider: {
     owns(label: string): boolean;
     labelOfView?(viewId: string): string | null;
     sendInput(label: string, input: SurfacePointerInput): Promise<void>;
+    sendWheel(label: string, input: SurfaceWheelInput): Promise<void>;
     inputState(label: string, at?: { x: number; y: number }): Promise<Record<string, unknown>>;
   }): () => void;
   settings?: { get(key: string): unknown };
@@ -284,6 +294,9 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         const route = pointerInputByLabel.get(label);
         if (!route) throw new Error(`terminal surface ${label} has no live pointer route`);
         await route(input);
+      },
+      sendWheel: async () => {
+        throw new Error("WHEEL_INPUT_UNIMPLEMENTED");
       },
       inputState: (label, at) => surface.deliver(label, { verb: "state", ...(at ? { at } : {}) }),
     });

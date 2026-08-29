@@ -488,6 +488,39 @@ describe("the vision surface presenter", () => {
     container.remove();
   });
 
+  it("routes owner wheel input through the native engine surface", async () => {
+    const messages: Record<string, unknown>[] = [];
+    const { app, providers } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => {
+          messages.push(message);
+          if (message.verb === "state") return { sequence: 1, cols: 10, rows: 5 };
+          if (message.verb === "wheel") return {
+            route: "scrollback", offset: 2, historySize: 20, written: 0,
+          };
+          return {};
+        },
+      },
+    });
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-wheel.1", () => {}, options);
+    expect(ingestTerminalSurfaceState({ pane: "tab-wheel.1", sequence: 1 })).toBe(true);
+    const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
+    await vi.waitFor(() => expect(screen.dataset.surfaceReady).toBe("true"));
+    await providers[0].sendWheel("terminal.win-test.tab-wheel-1", {
+      x: 12, y: 24, deltaX: 0, deltaY: -2, deltaMode: "line",
+      modifiers: { shift: true, alt: false, control: false, meta: false },
+    });
+    expect(messages.find((message) => message.verb === "wheel")).toEqual({
+      verb: "wheel", point: { x: 12, y: 24 }, deltaX: 0, deltaY: -2, deltaMode: "line",
+      modifiers: { shift: true, alt: false, control: false, meta: false },
+    });
+    expect(screen.dataset.wheelRoute).toBe("scrollback");
+    expect(screen.dataset.wheelSequence).toBe("1");
+    presenter.dispose();
+  });
+
   it("serializes an ungrabbed pointer drag into exact cell selection gestures", async () => {
     const messages: Record<string, unknown>[] = [];
     let selectionSequence = 0;
