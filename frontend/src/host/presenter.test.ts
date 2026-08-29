@@ -268,15 +268,25 @@ describe("the vision surface presenter", () => {
   it("publishes the engine cursor state through the terminal screen", async () => {
     shownLog.clear();
     let phase: "on" | "off" = "off";
+    const focuses: boolean[] = [];
     const { app } = fakeApp({
       surface: {
         label: (kind, viewId) => `${kind}.win-test.${viewId}`,
-        deliver: async (_label, message) => message.verb === "state" ? {
-          sequence: 9, cols: 120, rows: 30,
-          cursorRow: 3, cursorColumn: 7, cursorVisible: true,
-          cursorShape: "bar", cursorBlinking: true,
-          cursorAnimation: { intervalMs: 750, phase },
-        } : {},
+        deliver: async (_label, message) => {
+          if (message.verb === "focus") {
+            focuses.push(message.focused === true);
+            return {
+              focused: message.focused === true,
+              cursorPresentation: message.focused === true ? "engine" : "hollow-block",
+            };
+          }
+          return message.verb === "state" ? {
+            sequence: 9, cols: 120, rows: 30,
+            cursorRow: 3, cursorColumn: 7, cursorVisible: true,
+            cursorShape: "bar", cursorBlinking: true,
+            cursorAnimation: { intervalMs: 750, phase },
+          } : {};
+        },
       },
     });
     const container = document.createElement("div");
@@ -312,6 +322,7 @@ describe("the vision surface presenter", () => {
     expect(changed).toHaveBeenCalled();
     input.blur();
     expect(screen.dataset.cursorActive).toBe("false");
+    await vi.waitFor(() => expect(focuses).toEqual([true, false]));
     subscription.dispose();
     presenter.dispose();
     container.remove();
