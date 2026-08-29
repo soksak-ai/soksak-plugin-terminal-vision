@@ -99,7 +99,14 @@ function terminalThemeStatus(value: Record<string, unknown>): TerminalThemeStatu
   } as TerminalThemeStatus;
   try {
     const expected = resolveTerminalTheme(candidate.baseTheme, candidate.terminalOverrides);
-    if (JSON.stringify(expected) !== JSON.stringify(candidate.effectiveTheme)) return null;
+    const actual = candidate.effectiveTheme;
+    if (actual.foreground !== expected.foreground
+      || actual.background !== expected.background
+      || actual.cursor !== expected.cursor
+      || actual.cursorAccent !== expected.cursorAccent
+      || actual.selectionBackground !== expected.selectionBackground
+      || actual.ansi.length !== expected.ansi.length
+      || actual.ansi.some((color, index) => color !== expected.ansi[index])) return null;
     return cloneTerminalThemeStatus({ ...candidate, effectiveTheme: expected });
   } catch {
     return null;
