@@ -178,14 +178,20 @@ export function encodeProxyKey(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "a
 
 export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
   const live = new Set<string>();
+  const focusInputByLabel = new Map<string, () => void>();
   let pointerRegistered = false;
   const registerPointerProvider = (surface: SurfaceCapability) => {
     if (pointerRegistered || !app.provideSurfaceInput) return;
     pointerRegistered = true;
     app.provideSurfaceInput({
       owns: (label) => live.has(label),
-      sendInput: (label, input) =>
-        surface.deliver(label, { verb: "input", pointer: input as unknown as Record<string, unknown> }).then(() => undefined),
+      sendInput: async (label, input) => {
+        if (input.kind === "down") {
+          focusInputByLabel.get(label)?.();
+          await surface.deliver(label, { verb: "focus" });
+        }
+        await surface.deliver(label, { verb: "input", pointer: input as unknown as Record<string, unknown> });
+      },
       inputState: (label, at) => surface.deliver(label, { verb: "state", ...(at ? { at } : {}) }),
     });
   };
@@ -315,6 +321,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         input.focus();
         void deliver({ verb: "focus" }).catch(() => {});
       };
+      focusInputByLabel.set(label, () => input.focus());
       container.addEventListener("mousedown", onMousedown);
 
       const state: SurfaceState = {
@@ -543,6 +550,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           stateDoors.delete(pane);
           stateEventListeners.clear();
           live.delete(label);
+          focusInputByLabel.delete(label);
           input.removeEventListener("keydown", onKeydown);
           input.removeEventListener("compositionend", onCompositionEnd);
           input.removeEventListener("paste", onPaste);
