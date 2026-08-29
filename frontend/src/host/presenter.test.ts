@@ -31,6 +31,10 @@ function fakeApp(overrides: Partial<SurfaceApp> = {}) {
           active: false, text: "", kind: null, anchor: null, focus: null,
           gestureId: null, sequence: 0,
         };
+        if (message.verb === "focus") return {
+          focused: message.focused === true,
+          cursorPresentation: message.focused === true ? "engine" : "hollow-block",
+        };
         if (message.verb === "state") return { sequence: 3, cols: 80, rows: 24 };
         return {};
       },
@@ -490,6 +494,9 @@ describe("the vision surface presenter", () => {
       x: 45, y: 15, kind: "up", button: "left", clickCount: 1,
       modifiers: { shift: false, alt: false, control: false, meta: false },
     });
+    const focuses = messages.filter((message) => message.verb === "focus");
+    expect(focuses).toContainEqual({ verb: "focus", focused: true });
+    expect(focuses.every((message) => typeof message.focused === "boolean")).toBe(true);
     await vi.waitFor(() => expect(messages.filter((message) => message.verb === "selection")).toHaveLength(3));
     const selection = messages.filter((message) => message.verb === "selection");
     expect(selection.map((message) => message.phase)).toEqual(["begin", "update", "end"]);

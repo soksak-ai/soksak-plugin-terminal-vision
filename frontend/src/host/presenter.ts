@@ -278,7 +278,7 @@ export function encodeProxyKey(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "a
 export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
   const live = new Set<string>();
   const labelByView = new Map<string, string>();
-  const focusInputByLabel = new Map<string, () => void>();
+  const focusInputByLabel = new Map<string, () => Promise<void>>();
   const pointerInputByLabel = new Map<string, (input: SurfacePointerInput) => Promise<void>>();
   const wheelInputByLabel = new Map<string, (input: SurfaceWheelInput) => Promise<void>>();
   let pointerRegistered = false;
@@ -290,8 +290,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       labelOfView: (viewId) => labelByView.get(viewId) ?? null,
       sendInput: async (label, input) => {
         if (input.kind === "down") {
-          focusInputByLabel.get(label)?.();
-          await surface.deliver(label, { verb: "focus" });
+          await focusInputByLabel.get(label)?.();
         }
         const route = pointerInputByLabel.get(label);
         if (!route) throw new Error(`terminal surface ${label} has no live pointer route`);
@@ -425,7 +424,6 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       container.append(screen, input);
       live.add(label);
       labelByView.set(pane.slice(0, pane.lastIndexOf(".")), label);
-      focusInputByLabel.set(label, () => input.focus());
 
       const state: SurfaceState = {
         sequence: null, cols: 0, rows: 0, offset: 0, historySize: 0, text: "",
@@ -465,6 +463,10 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           throw error;
         }
       };
+      focusInputByLabel.set(label, async () => {
+        input.focus();
+        await deliverFocus(true);
+      });
       const onInputFocus = () => {
         syncCursorPresentation();
         if (surfaceStateReady) void deliverFocus(document.activeElement === input).catch(() => {});
@@ -613,7 +615,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           }, true).catch(() => {});
           return;
         }
-        void deliver({ verb: "focus" }).catch(() => {});
+        void deliverFocus(true).catch(() => {});
         if (event.button !== 0) return;
         const rect = screen.getBoundingClientRect();
         const point = selectionPoint(event.clientX - rect.left, event.clientY - rect.top);
