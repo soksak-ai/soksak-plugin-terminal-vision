@@ -120,6 +120,21 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
+  it("awaits the native selection reply instead of returning stale presenter state", async () => {
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => message.verb === "selection"
+          ? { text: "native selection" }
+          : {},
+      },
+    });
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
+    await expect(Promise.resolve(presenter.selection?.())).resolves.toBe("native selection");
+    presenter.dispose();
+  });
+
   it("waits for text from surface state events without polling", async () => {
     let text = "";
     let reads = 0;
