@@ -27,7 +27,9 @@ A pane adds no process. The web content process is not on the hot path.
    sidecar publish, `window.snapshot` for observation.
 6. Cursor shape, visibility, position, blink policy and blink phase come from the engine and
    renderer `surface.state`. This plugin mirrors that state into the public terminal DOM and
-   status event. It does not parse CSI or create a blink timer.
+   status event. It does not parse CSI or create a blink timer. Input focus and blur send the
+   explicit boolean `surface.focus` transaction after surface readiness; repeated equal focus is
+   coalesced. Focus presentation is painted by the render owner.
 7. The declaration carries an explicit `light|dark` base theme. A host theme epoch sends one
    `surface.theme` command. Only a complete `surface.state` reply becomes `themeStatus`; no
    unthemed fallback or polling path exists. Text waits subscribe to state events and use one

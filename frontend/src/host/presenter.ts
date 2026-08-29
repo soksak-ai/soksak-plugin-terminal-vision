@@ -437,6 +437,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       const presentationListeners = new Set<() => void>();
       const stateEventListeners = new Set<() => void>();
       const syncCursorPresentation = () => {
+        const focused = document.activeElement === input;
         screen.dataset.cursorRow = String(state.cursorRow);
         screen.dataset.cursorColumn = String(state.cursorColumn);
         screen.dataset.cursorVisible = String(state.cursorVisible);
@@ -444,11 +445,30 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         screen.dataset.cursorBlinking = String(state.cursorBlinking);
         screen.dataset.cursorAnimationIntervalMs = String(state.cursorAnimation.intervalMs);
         screen.dataset.cursorAnimationPhase = state.cursorAnimation.phase;
+        screen.dataset.cursorPresentation = focused ? "engine" : "hollow-block";
         screen.dataset.cursorActive = String(
-          state.cursorVisible && state.cursorAnimation.phase !== "off" && document.activeElement === input,
+          state.cursorVisible && state.cursorAnimation.phase !== "off" && focused,
         );
       };
-      const onInputFocus = () => syncCursorPresentation();
+      let deliveredFocus: boolean | null = null;
+      const deliverFocus = async (focused: boolean): Promise<void> => {
+        if (deliveredFocus === focused) return;
+        deliveredFocus = focused;
+        try {
+          const reply = await deliver({ verb: "focus", focused });
+          if (reply.focused !== focused) throw new Error("surface.focus returned another focus state");
+          screen.dataset.cursorPresentation = String(reply.cursorPresentation);
+          delete screen.dataset.focusError;
+        } catch (error) {
+          deliveredFocus = null;
+          screen.dataset.focusError = String(error);
+          throw error;
+        }
+      };
+      const onInputFocus = () => {
+        syncCursorPresentation();
+        if (surfaceStateReady) void deliverFocus(document.activeElement === input).catch(() => {});
+      };
       input.addEventListener("focus", onInputFocus);
       input.addEventListener("blur", onInputFocus);
       syncCursorPresentation();
@@ -671,7 +691,10 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         const phase = event.kind === "down" ? "down" : event.kind === "up" ? "up"
           : event.kind === "move" || event.kind === "drag" ? "move" : null;
         if (!phase) return;
-        if (focusFirst) await deliver({ verb: "focus" });
+        if (focusFirst) {
+          input.focus();
+          await deliverFocus(true);
+        }
         const reply = await deliver({
           verb: "pointer", point: { x: event.x, y: event.y }, phase,
           button: event.kind === "move" ? "none" : event.button,
@@ -804,6 +827,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           surfaceStateReady = true;
           settleReadiness(true);
           screen.dataset.surfaceReady = "true";
+          void deliverFocus(document.activeElement === input).catch(() => {});
         }).catch((error) => {
           observation.stateFailures += 1;
           observation.lastError = String(error);
@@ -915,7 +939,6 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         },
         focus() {
           input.focus();
-          void deliver({ verb: "focus" }).catch(() => {});
           return true;
         },
         setVisibility(next: TerminalVisibilityState) {

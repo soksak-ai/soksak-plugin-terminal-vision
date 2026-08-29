@@ -28,7 +28,9 @@ pane 은 프로세스를 더하지 않는다. 웹 콘텐츠 프로세스는 뜨�
    관측용 `window.snapshot`.
 6. 커서 모양·표시·위치·깜빡임 정책·현재 단계는 엔진과 renderer 의 `surface.state`에서 온다.
    이 플러그인은 그 상태를 공개 터미널 DOM과 status event에 투영한다. CSI를 파싱하거나 커서
-   타이머를 만들지 않는다.
+   타이머를 만들지 않는다. Input focus와 blur는 surface readiness 뒤 explicit boolean
+   `surface.focus` transaction을 보내고 같은 focus의 반복은 합칩니다. Focus presentation은 render
+   owner가 그립니다.
 7. 선언은 명시적인 `light|dark` base theme을 포함한다. Host theme epoch는 `surface.theme`
    command 하나를 보낸다. 완전한 `surface.state` 응답만 `themeStatus`가 되며 unthemed fallback과
    polling 경로는 없다. Text wait는 state event를 구독하고 deadline timeout 하나만 사용한다.
