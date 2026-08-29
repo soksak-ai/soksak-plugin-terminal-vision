@@ -422,6 +422,61 @@ describe("the vision surface presenter", () => {
     container.remove();
   });
 
+  it("serializes an ungrabbed pointer drag into exact cell selection gestures", async () => {
+    const messages: Record<string, unknown>[] = [];
+    let selectionSequence = 0;
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => {
+          messages.push(message);
+          if (message.verb === "state") return {
+            sequence: 1, cols: 10, rows: 5,
+            modes: {
+              mouseClick: false, mouseDrag: false, mouseMotion: false,
+              sgrMouse: false, utf8Mouse: false, alternateScroll: false,
+            },
+          };
+          if (message.verb === "selection") {
+            selectionSequence += 1;
+            return {
+              active: true, text: "dragged", kind: "simple", gestureId: message.gestureId,
+              anchor: message.point, focus: message.point, sequence: selectionSequence,
+            };
+          }
+          return {};
+        },
+      },
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const presenter = createVisionRenderer(app).create(container, "tab-drag.1", () => {}, options);
+    const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
+    screen.getBoundingClientRect = () => ({
+      x: 0, y: 0, left: 0, top: 0, right: 100, bottom: 50,
+      width: 100, height: 50, toJSON: () => ({}),
+    });
+    expect(ingestTerminalSurfaceState({ pane: "tab-drag.1", sequence: 1 })).toBe(true);
+    await vi.waitFor(() => expect(screen.dataset.surfaceReady).toBe("true"));
+    const fire = (type: string, x: number, buttons: number) => screen.dispatchEvent(new MouseEvent(type, {
+      clientX: x, clientY: 15, button: 0, buttons, detail: 1, bubbles: true, cancelable: true,
+    }));
+    fire("pointerdown", 15, 1);
+    fire("pointermove", 45, 1);
+    fire("pointerup", 45, 0);
+    await vi.waitFor(() => expect(messages.filter((message) => message.verb === "selection")).toHaveLength(3));
+    const selection = messages.filter((message) => message.verb === "selection");
+    expect(selection.map((message) => message.phase)).toEqual(["begin", "update", "end"]);
+    expect(selection.map((message) => message.point)).toEqual([
+      { row: 1, col: 1, side: "right" },
+      { row: 1, col: 4, side: "right" },
+      { row: 1, col: 4, side: "right" },
+    ]);
+    expect(new Set(selection.map((message) => message.gestureId)).size).toBe(1);
+    presenter.dispose();
+    container.remove();
+  });
+
   it("routes typed keys to the pane and leaves shortcuts alone", async () => {
     const send = vi.fn();
     const { app } = fakeApp();
