@@ -4,7 +4,7 @@
     "en": "Vision Terminal",
     "ko": "Vision 터미널"
   },
-  "version": "0.0.8",
+  "version": "0.0.9",
   "appVersionRequirement": "0.0.1",
   "description": {
     "en": "A terminal whose pixels are painted by its render sidecar into a native surface.",
@@ -368,27 +368,27 @@
       },
       {
         "id": "soksak-sidecar-terminal-alacritty",
-        "version": "0.0.31"
+        "version": "0.0.32"
       },
       {
         "id": "soksak-sidecar-terminal-ghostty",
-        "version": "0.0.31"
+        "version": "0.0.32"
       },
       {
         "id": "soksak-sidecar-terminal-kitty",
-        "version": "0.0.27"
+        "version": "0.0.28"
       },
       {
         "id": "soksak-sidecar-terminal-shitty",
-        "version": "0.0.26"
+        "version": "0.0.27"
       },
       {
         "id": "soksak-sidecar-terminal-vt100",
-        "version": "0.0.30"
+        "version": "0.0.31"
       },
       {
         "id": "soksak-sidecar-terminal-wezterm",
-        "version": "0.0.30"
+        "version": "0.0.31"
       }
     ]
   }
