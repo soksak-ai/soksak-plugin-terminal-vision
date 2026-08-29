@@ -460,6 +460,10 @@ describe("the vision surface presenter", () => {
     const presenter = createVisionRenderer(app).create(container, "tab-native-drag.1", () => {}, options);
     expect(ingestTerminalSurfaceState({ pane: "tab-native-drag.1", sequence: 1 })).toBe(true);
     const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
+    screen.getBoundingClientRect = () => ({
+      x: 0, y: 0, left: 0, top: 0, right: 100, bottom: 50,
+      width: 100, height: 50, toJSON: () => ({}),
+    });
     await vi.waitFor(() => expect(screen.dataset.surfaceReady).toBe("true"));
 
     await providers[0].sendInput("terminal.win-test.tab-native-drag-1", {

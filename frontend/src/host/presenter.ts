@@ -268,6 +268,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
   const live = new Set<string>();
   const labelByView = new Map<string, string>();
   const focusInputByLabel = new Map<string, () => void>();
+  const pointerInputByLabel = new Map<string, (input: SurfacePointerInput) => Promise<void>>();
   let pointerRegistered = false;
   const registerPointerProvider = (surface: SurfaceCapability) => {
     if (pointerRegistered || !app.provideSurfaceInput) return;
@@ -280,6 +281,9 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           focusInputByLabel.get(label)?.();
           await surface.deliver(label, { verb: "focus" });
         }
+        const route = pointerInputByLabel.get(label);
+        if (!route) throw new Error(`terminal surface ${label} has no live pointer route`);
+        await route(input);
       },
       inputState: (label, at) => surface.deliver(label, { verb: "state", ...(at ? { at } : {}) }),
     });
@@ -510,15 +514,15 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       type GestureKind = "simple" | "block" | "semantic" | "line" | "extend";
       let activeGesture: { id: string; kind: GestureKind; pointerId: number | null } | null = null;
       let selectionQueue = Promise.resolve();
-      const selectionPoint = (event: PointerEvent): SurfaceSelectionPoint | null => {
+      const selectionPoint = (x: number, y: number): SurfaceSelectionPoint | null => {
         if (state.cols < 1 || state.rows < 1) return null;
         const rect = screen.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return null;
-        const x = Math.max(0, Math.min(rect.width - Number.EPSILON, event.clientX - rect.left));
-        const y = Math.max(0, Math.min(rect.height - Number.EPSILON, event.clientY - rect.top));
-        const columnValue = x / rect.width * state.cols;
+        const localX = Math.max(0, Math.min(rect.width - Number.EPSILON, x));
+        const localY = Math.max(0, Math.min(rect.height - Number.EPSILON, y));
+        const columnValue = localX / rect.width * state.cols;
         return {
-          row: Math.min(state.rows - 1, Math.floor(y / rect.height * state.rows)),
+          row: Math.min(state.rows - 1, Math.floor(localY / rect.height * state.rows)),
           col: Math.min(state.cols - 1, Math.floor(columnValue)),
           side: columnValue - Math.floor(columnValue) < 0.5 ? "left" : "right",
         };
@@ -526,7 +530,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       const modifiers = (event: PointerEvent) => ({
         shift: event.shiftKey, alt: event.altKey, control: event.ctrlKey, meta: event.metaKey,
       });
-      const enqueueSelection = (message: Record<string, unknown>) => {
+      const enqueueSelection = (message: Record<string, unknown>): Promise<void> => {
         selectionQueue = selectionQueue
           .catch(() => {})
           .then(async () => {
@@ -536,6 +540,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           .catch((error) => {
             screen.dataset.selectionError = String(error);
           });
+        return selectionQueue;
       };
       const localSelection = (event: PointerEvent) => {
         const grabbed = state.modes !== null
@@ -553,7 +558,8 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         input.focus();
         void deliver({ verb: "focus" }).catch(() => {});
         if (!localSelection(event)) return;
-        const point = selectionPoint(event);
+        const rect = screen.getBoundingClientRect();
+        const point = selectionPoint(event.clientX - rect.left, event.clientY - rect.top);
         if (!point) return;
         event.preventDefault();
         const id = crypto.randomUUID();
@@ -570,7 +576,8 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       };
       const onPointerMove = (event: PointerEvent) => {
         if (!activeGesture || (event.buttons & 1) === 0) return;
-        const point = selectionPoint(event);
+        const rect = screen.getBoundingClientRect();
+        const point = selectionPoint(event.clientX - rect.left, event.clientY - rect.top);
         if (!point) return;
         event.preventDefault();
         enqueueSelection({
@@ -582,7 +589,8 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         if (!activeGesture || event.button !== 0) return;
         const gesture = activeGesture;
         activeGesture = null;
-        const point = selectionPoint(event);
+        const rect = screen.getBoundingClientRect();
+        const point = selectionPoint(event.clientX - rect.left, event.clientY - rect.top);
         if (!point) return;
         event.preventDefault();
         enqueueSelection({
@@ -595,6 +603,42 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         activeGesture = null;
         enqueueSelection({ action: "clear" });
       };
+      pointerInputByLabel.set(label, async (event) => {
+        if (event.button !== "left") return;
+        const grabbed = state.modes !== null
+          && (state.modes.mouseClick || state.modes.mouseDrag || state.modes.mouseMotion);
+        if (event.kind === "down") {
+          if (grabbed || state.modes === null) return;
+          const point = selectionPoint(event.x, event.y);
+          if (!point) return;
+          const id = crypto.randomUUID();
+          activeGesture = { id, kind: event.clickCount >= 3 ? "line" : event.clickCount === 2 ? "semantic" : "simple", pointerId: null };
+          await enqueueSelection({
+            action: "gesture", gestureId: id, phase: "begin", kind: activeGesture.kind,
+            point, modifiers: { shift: false, alt: false, control: false, meta: false },
+          });
+          return;
+        }
+        if (event.kind === "drag" && activeGesture) {
+          const point = selectionPoint(event.x, event.y);
+          if (!point) return;
+          await enqueueSelection({
+            action: "gesture", gestureId: activeGesture.id, phase: "update", kind: activeGesture.kind,
+            point, modifiers: { shift: false, alt: false, control: false, meta: false },
+          });
+          return;
+        }
+        if (event.kind === "up" && activeGesture) {
+          const gesture = activeGesture;
+          activeGesture = null;
+          const point = selectionPoint(event.x, event.y);
+          if (!point) return;
+          await enqueueSelection({
+            action: "gesture", gestureId: gesture.id, phase: "end", kind: gesture.kind,
+            point, modifiers: { shift: false, alt: false, control: false, meta: false },
+          });
+        }
+      });
       screen.addEventListener("pointerdown", onPointerDown);
       screen.addEventListener("pointermove", onPointerMove);
       screen.addEventListener("pointerup", onPointerUp);
@@ -777,6 +821,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           live.delete(label);
           labelByView.delete(pane.slice(0, pane.lastIndexOf(".")));
           focusInputByLabel.delete(label);
+          pointerInputByLabel.delete(label);
           input.removeEventListener("keydown", onKeydown);
           input.removeEventListener("compositionend", onCompositionEnd);
           input.removeEventListener("paste", onPaste);
