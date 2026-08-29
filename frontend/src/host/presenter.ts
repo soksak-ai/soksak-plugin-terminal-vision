@@ -39,6 +39,7 @@ export interface SurfaceApp {
   surface?: SurfaceCapability;
   provideSurfaceInput?(provider: {
     owns(label: string): boolean;
+    labelOfView?(viewId: string): string | null;
     sendInput(label: string, input: SurfacePointerInput): Promise<void>;
     inputState(label: string, at?: { x: number; y: number }): Promise<Record<string, unknown>>;
   }): () => void;
@@ -178,6 +179,7 @@ export function encodeProxyKey(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "a
 
 export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
   const live = new Set<string>();
+  const labelByView = new Map<string, string>();
   const focusInputByLabel = new Map<string, () => void>();
   let pointerRegistered = false;
   const registerPointerProvider = (surface: SurfaceCapability) => {
@@ -185,6 +187,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
     pointerRegistered = true;
     app.provideSurfaceInput({
       owns: (label) => live.has(label),
+      labelOfView: (viewId) => labelByView.get(viewId) ?? null,
       sendInput: async (label, input) => {
         if (input.kind === "down") {
           focusInputByLabel.get(label)?.();
@@ -315,6 +318,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       if (!container.style.position) container.style.position = "relative";
       container.append(screen, input);
       live.add(label);
+      labelByView.set(pane.slice(0, pane.lastIndexOf(".")), label);
       // The native layer passes clicks through; the container is what the
       // click lands on, and the hidden textarea is where keys must go.
       const onMousedown = () => {
@@ -550,6 +554,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           stateDoors.delete(pane);
           stateEventListeners.clear();
           live.delete(label);
+          labelByView.delete(pane.slice(0, pane.lastIndexOf(".")));
           focusInputByLabel.delete(label);
           input.removeEventListener("keydown", onKeydown);
           input.removeEventListener("compositionend", onCompositionEnd);
