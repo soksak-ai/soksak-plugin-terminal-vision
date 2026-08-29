@@ -38,7 +38,7 @@ describe("terminal plugin manifest contract", () => {
       { id: "soksak-sidecar-pty", version: "0.0.17" },
       { id: "soksak-sidecar-terminal-alacritty", version: "0.0.37" },
       { id: "soksak-sidecar-terminal-ghostty", version: "0.0.34" },
-      { id: "soksak-sidecar-terminal-kitty", version: "0.0.29" },
+      { id: "soksak-sidecar-terminal-kitty", version: "0.0.31" },
       { id: "soksak-sidecar-terminal-shitty", version: "0.0.28" },
       { id: "soksak-sidecar-terminal-vt100", version: "0.0.32" },
       { id: "soksak-sidecar-terminal-wezterm", version: "0.0.32" },
