@@ -7,6 +7,7 @@ import {
   type TerminalPresenter,
   type TerminalPresenterOptions,
   type TerminalRendererAdapter,
+  type TerminalVisibilityState,
 } from "@soksak/soksak-kit-plugin-terminal";
 import {
   resolveTerminalTheme,
@@ -114,11 +115,13 @@ function terminalThemeStatus(value: Record<string, unknown>): TerminalThemeStatu
 }
 
 interface PresenterObservation {
-  setShown: number;
-  lastShown: boolean;
+  setVisibility: number;
+  lastIntrinsicVisible: boolean;
+  lastHostVisible: boolean;
+  lastEffectiveVisible: boolean;
   focus: number;
   declWrites: number;
-  seq: Array<{ v: boolean; d: number; t: number; n: number }>;
+  seq: Array<{ intrinsic: boolean; host: boolean; effective: boolean; dim: number; t: number; n: number }>;
   stateEvents: number;
   stateReads: number;
   stateFailures: number;
@@ -135,7 +138,11 @@ function logOf(label: string) {
   let entry = shownLog.get(label);
   if (!entry) {
     entry = {
-      setShown: 0, lastShown: true, focus: 0, declWrites: 0, seq: [],
+      setVisibility: 0,
+      lastIntrinsicVisible: true,
+      lastHostVisible: true,
+      lastEffectiveVisible: true,
+      focus: 0, declWrites: 0, seq: [],
       stateEvents: 0, stateReads: 0, stateFailures: 0,
       lastEvent: null, lastRead: null, lastError: null,
     };
@@ -268,11 +275,10 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       Object.assign(screen.style, { position: "absolute", inset: "0" });
       const generation = 1;
       let declared = false;
-      // The declaration is the single owner of visible and alpha. dim is the
-      // focus lighting the host reports (0..1), applied to the layer's own
-      // alpha exactly as the browser plugin does — the document veil above the
-      // layer cannot darken it.
-      let shown = true;
+      // Workbench pane visibility is intrinsic to this Plugin declaration. Core view visibility
+      // lives on the host ancestor and is never copied here. dim remains native alpha because the
+      // document focus-lighting veil cannot darken a child surface composited above it.
+      let intrinsicVisible = true;
       let dim = 0;
       const writeDeclaration = () => {
         logOf(label).declWrites += 1;
@@ -282,7 +288,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
             // explicitly requests ordering. The browser surface uses 0; inventing 10 here made
             // terminal and browser presentation differ for no declared reason.
             id: label, generation, source, layer: 0,
-            visible: shown, alpha: 1 - dim,
+            visible: intrinsicVisible, alpha: 1 - dim,
           }),
         )) {
           screen.setAttribute(name, value);
@@ -548,20 +554,27 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           void deliver({ verb: "focus" }).catch(() => {});
           return true;
         },
-        setShown(next: boolean, dimNext = 0) {
+        setVisibility(next: TerminalVisibilityState) {
           const entry = logOf(label);
-          entry.setShown += 1;
-          entry.lastShown = next;
-          entry.seq.push({ v: next, d: dimNext, t: Date.now() % 1000000, n: ++shownEventCounter });
+          entry.setVisibility += 1;
+          entry.lastIntrinsicVisible = next.intrinsicVisible;
+          entry.lastHostVisible = next.hostVisible;
+          entry.lastEffectiveVisible = next.effectiveVisible;
+          entry.seq.push({
+            intrinsic: next.intrinsicVisible,
+            host: next.hostVisible,
+            effective: next.effectiveVisible,
+            dim: next.dim,
+            t: Date.now() % 1000000,
+            n: ++shownEventCounter,
+          });
           if (entry.seq.length > 24) entry.seq.shift();
-          // visible hides the layer for an overlay's time; dim darkens it while
-          // it stays shown but unfocused. Both live in the one declaration.
-          shown = next;
-          dim = dimNext;
+          intrinsicVisible = next.intrinsicVisible;
+          dim = next.dim;
           if (declared) writeDeclaration();
           else {
-            screen.setAttribute("data-native-visible", String(next));
-            screen.setAttribute("data-native-alpha", String(1 - dimNext));
+            screen.setAttribute("data-native-visible", String(next.intrinsicVisible));
+            screen.setAttribute("data-native-alpha", String(1 - next.dim));
           }
         },
         scrollState: () => ({ offset: state.offset, historySize: state.historySize }),

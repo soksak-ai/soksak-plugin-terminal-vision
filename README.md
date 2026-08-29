@@ -10,6 +10,12 @@ process. The presenter mirrors the engine-owned cursor state into the contract D
 changes through the shared terminal status path. It parses no control sequence and runs no cursor
 timer.
 
+Visibility follows the shared compositor ownership contract. Workbench pane visibility alone is
+written to the surface's intrinsic `data-native-visible`; Core workspace, tab, and overlay
+presentation remains on the host ancestor and is never copied into the Plugin declaration. Host
+dim changes only native alpha. The Kit supplies all four observable facts—intrinsic, host,
+effective, and dim—through one `TerminalVisibilityState` update.
+
 ## Verification
 
 ```sh

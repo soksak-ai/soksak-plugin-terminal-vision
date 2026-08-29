@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@soksak/soksak-contract-plugin-terminal": "0.0.15",
-    "@soksak/soksak-kit-plugin-terminal": "0.0.76"
+    "@soksak/soksak-kit-plugin-terminal": "0.0.77"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
