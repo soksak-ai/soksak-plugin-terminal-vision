@@ -32,8 +32,9 @@ export interface SurfacePointerInput {
   x: number;
   y: number;
   kind: "down" | "up" | "move" | "drag" | "enter" | "exit";
-  button: "left" | "right";
+  button: "left" | "middle" | "right";
   clickCount: number;
+  modifiers: { shift: boolean; alt: boolean; control: boolean; meta: boolean };
 }
 
 export interface SurfaceWheelInput {
@@ -546,6 +547,17 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       const modifiers = (event: PointerEvent) => ({
         shift: event.shiftKey, alt: event.altKey, control: event.ctrlKey, meta: event.metaKey,
       });
+      const mouseTracking = () => state.modes !== null
+        && (state.modes.mouseClick || state.modes.mouseDrag || state.modes.mouseMotion);
+      let surfaceInputQueue = Promise.resolve();
+      const enqueueSurfaceInput = (
+        operation: () => Promise<void>,
+        recordError: (error: unknown) => void,
+      ): Promise<void> => {
+        const running = surfaceInputQueue.catch(() => {}).then(operation);
+        surfaceInputQueue = running.catch(recordError);
+        return running;
+      };
       const enqueueSelection = (message: Record<string, unknown>): Promise<void> => {
         selectionQueue = selectionQueue
           .catch(() => {})
@@ -559,9 +571,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         return selectionQueue;
       };
       const localSelection = (event: PointerEvent) => {
-        const grabbed = state.modes !== null
-          && (state.modes.mouseClick || state.modes.mouseDrag || state.modes.mouseMotion);
-        return event.shiftKey || (state.modes !== null && !grabbed);
+        return event.shiftKey || (state.modes !== null && !mouseTracking());
       };
       const kindOf = (event: PointerEvent): GestureKind => {
         if (event.ctrlKey && event.altKey) return "block";
@@ -570,10 +580,21 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         return "simple";
       };
       const onPointerDown = (event: PointerEvent) => {
-        if (event.button !== 0) return;
         input.focus();
+        if (!localSelection(event)) {
+          const button = event.button === 0 ? "left" : event.button === 1 ? "middle"
+            : event.button === 2 ? "right" : null;
+          if (!button || !mouseTracking()) return;
+          const rect = screen.getBoundingClientRect();
+          event.preventDefault();
+          void enqueuePointer({
+            x: Math.max(0, event.clientX - rect.left), y: Math.max(0, event.clientY - rect.top),
+            kind: "down", button, clickCount: Math.max(1, event.detail), modifiers: modifiers(event),
+          }, true).catch(() => {});
+          return;
+        }
         void deliver({ verb: "focus" }).catch(() => {});
-        if (!localSelection(event)) return;
+        if (event.button !== 0) return;
         const rect = screen.getBoundingClientRect();
         const point = selectionPoint(event.clientX - rect.left, event.clientY - rect.top);
         if (!point) return;
@@ -591,7 +612,20 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         });
       };
       const onPointerMove = (event: PointerEvent) => {
-        if (!activeGesture || (event.buttons & 1) === 0) return;
+        if (!activeGesture) {
+          if (!mouseTracking() || event.shiftKey) return;
+          const button = (event.buttons & 1) !== 0 ? "left" : (event.buttons & 4) !== 0
+            ? "middle" : (event.buttons & 2) !== 0 ? "right" : "left";
+          const rect = screen.getBoundingClientRect();
+          event.preventDefault();
+          void enqueuePointer({
+            x: Math.max(0, event.clientX - rect.left), y: Math.max(0, event.clientY - rect.top),
+            kind: event.buttons === 0 ? "move" : "drag", button, clickCount: 0,
+            modifiers: modifiers(event),
+          }).catch(() => {});
+          return;
+        }
+        if ((event.buttons & 1) === 0) return;
         const rect = screen.getBoundingClientRect();
         const point = selectionPoint(event.clientX - rect.left, event.clientY - rect.top);
         if (!point) return;
@@ -602,7 +636,20 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         });
       };
       const onPointerUp = (event: PointerEvent) => {
-        if (!activeGesture || event.button !== 0) return;
+        if (!activeGesture) {
+          if (!mouseTracking() || event.shiftKey) return;
+          const button = event.button === 0 ? "left" : event.button === 1 ? "middle"
+            : event.button === 2 ? "right" : null;
+          if (!button) return;
+          const rect = screen.getBoundingClientRect();
+          event.preventDefault();
+          void enqueuePointer({
+            x: Math.max(0, event.clientX - rect.left), y: Math.max(0, event.clientY - rect.top),
+            kind: "up", button, clickCount: Math.max(1, event.detail), modifiers: modifiers(event),
+          }).catch(() => {});
+          return;
+        }
+        if (event.button !== 0) return;
         const gesture = activeGesture;
         activeGesture = null;
         const rect = screen.getBoundingClientRect();
@@ -619,19 +666,48 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         activeGesture = null;
         enqueueSelection({ action: "clear" });
       };
+      let pointerSequence = 0;
+      const enqueuePointer = (event: SurfacePointerInput, focusFirst = false): Promise<void> => enqueueSurfaceInput(async () => {
+        const phase = event.kind === "down" ? "down" : event.kind === "up" ? "up"
+          : event.kind === "move" || event.kind === "drag" ? "move" : null;
+        if (!phase) return;
+        if (focusFirst) await deliver({ verb: "focus" });
+        const reply = await deliver({
+          verb: "pointer", point: { x: event.x, y: event.y }, phase,
+          button: event.kind === "move" ? "none" : event.button,
+          clickCount: event.clickCount, modifiers: event.modifiers,
+        });
+        if (reply.route !== "mouse-report" && reply.route !== "ignored") {
+          throw new Error("surface.pointer returned no valid route");
+        }
+        const written = Number(reply.written);
+        if (!Number.isSafeInteger(written) || written < 0) {
+          throw new Error("surface.pointer returned no valid written count");
+        }
+        pointerSequence += 1;
+        screen.dataset.pointerRoute = reply.route;
+        screen.dataset.pointerWritten = String(written);
+        screen.dataset.pointerSequence = String(pointerSequence);
+        delete screen.dataset.pointerError;
+      }, (error) => {
+        screen.dataset.pointerError = String(error);
+      });
       pointerInputByLabel.set(label, async (event) => {
+        const grabbed = mouseTracking();
+        if (grabbed && !event.modifiers.shift) {
+          await enqueuePointer(event);
+          return;
+        }
         if (event.button !== "left") return;
-        const grabbed = state.modes !== null
-          && (state.modes.mouseClick || state.modes.mouseDrag || state.modes.mouseMotion);
         if (event.kind === "down") {
-          if (grabbed || state.modes === null) return;
+          if (state.modes === null) return;
           const point = selectionPoint(event.x, event.y);
           if (!point) return;
           const id = crypto.randomUUID();
           activeGesture = { id, kind: event.clickCount >= 3 ? "line" : event.clickCount === 2 ? "semantic" : "simple", pointerId: null };
           await enqueueSelection({
             action: "gesture", gestureId: id, phase: "begin", kind: activeGesture.kind,
-            point, modifiers: { shift: false, alt: false, control: false, meta: false },
+            point, modifiers: event.modifiers,
           });
           return;
         }
@@ -640,7 +716,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           if (!point) return;
           await enqueueSelection({
             action: "gesture", gestureId: activeGesture.id, phase: "update", kind: activeGesture.kind,
-            point, modifiers: { shift: false, alt: false, control: false, meta: false },
+            point, modifiers: event.modifiers,
           });
           return;
         }
@@ -651,16 +727,13 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           if (!point) return;
           await enqueueSelection({
             action: "gesture", gestureId: gesture.id, phase: "end", kind: gesture.kind,
-            point, modifiers: { shift: false, alt: false, control: false, meta: false },
+            point, modifiers: event.modifiers,
           });
         }
       });
       let wheelSequence = 0;
-      let wheelQueue = Promise.resolve();
       const enqueueWheel = (event: SurfaceWheelInput): Promise<void> => {
-        const running = wheelQueue
-          .catch(() => {})
-          .then(async () => {
+        return enqueueSurfaceInput(async () => {
             const reply = await deliver({
               verb: "wheel", point: { x: event.x, y: event.y },
               deltaX: event.deltaX, deltaY: event.deltaY, deltaMode: event.deltaMode,
@@ -681,11 +754,9 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
             screen.dataset.wheelWritten = String(written);
             screen.dataset.wheelSequence = String(wheelSequence);
             delete screen.dataset.wheelError;
-          });
-        wheelQueue = running.catch((error) => {
+          }, (error) => {
           screen.dataset.wheelError = String(error);
         });
-        return running;
       };
       wheelInputByLabel.set(label, enqueueWheel);
       const onWheel = (event: WheelEvent) => {
