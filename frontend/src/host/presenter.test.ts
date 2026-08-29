@@ -538,6 +538,57 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
+  it("keeps pointer and wheel delivery in one chronological input queue", async () => {
+    const order: string[] = [];
+    let releasePointer!: () => void;
+    const pointerHeld = new Promise<void>((resolve) => { releasePointer = resolve; });
+    const { app, providers } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => {
+          if (message.verb === "state") return {
+            sequence: 1, cols: 10, rows: 5,
+            modes: {
+              mouseClick: true, mouseDrag: true, mouseMotion: false,
+              sgrMouse: true, utf8Mouse: false, alternateScroll: false,
+            },
+          };
+          if (message.verb === "pointer") {
+            order.push("pointer:start");
+            await pointerHeld;
+            order.push("pointer:end");
+            return { route: "mouse-report", written: 8 };
+          }
+          if (message.verb === "wheel") {
+            order.push("wheel");
+            return { route: "mouse-report", offset: 0, historySize: 0, written: 6 };
+          }
+          return {};
+        },
+      },
+    });
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-input-order.1", () => {}, options);
+    expect(ingestTerminalSurfaceState({ pane: "tab-input-order.1", sequence: 1 })).toBe(true);
+    await vi.waitFor(() => expect(container.querySelector<HTMLElement>("[data-native-surface]")!
+      .dataset.mouseTracking).toBe("true"));
+    const pointer = providers[0].sendInput("terminal.win-test.tab-input-order-1", {
+      x: 12, y: 24, kind: "drag", button: "left", clickCount: 0,
+      modifiers: { shift: false, alt: false, control: false, meta: false },
+    });
+    await vi.waitFor(() => expect(order).toEqual(["pointer:start"]));
+    const wheel = providers[0].sendWheel("terminal.win-test.tab-input-order-1", {
+      x: 12, y: 24, deltaX: 0, deltaY: -1, deltaMode: "line",
+      modifiers: { shift: false, alt: false, control: false, meta: false },
+    });
+    await Promise.resolve();
+    expect(order).toEqual(["pointer:start"]);
+    releasePointer();
+    await Promise.all([pointer, wheel]);
+    expect(order).toEqual(["pointer:start", "pointer:end", "wheel"]);
+    presenter.dispose();
+  });
+
   it("serializes an ungrabbed pointer drag into exact cell selection gestures", async () => {
     const messages: Record<string, unknown>[] = [];
     let selectionSequence = 0;
@@ -561,6 +612,7 @@ describe("the vision surface presenter", () => {
               anchor: message.point, focus: message.point, sequence: selectionSequence,
             };
           }
+          if (message.verb === "pointer") return { route: "mouse-report", written: 8 };
           return {};
         },
       },
@@ -596,9 +648,14 @@ describe("the vision surface presenter", () => {
     await vi.waitFor(() => expect(screen.dataset.mouseTracking).toBe("true"));
     messages.length = 0;
     fire("pointerdown", 15, 1);
+    fire("pointermove", 45, 1);
     fire("pointerup", 45, 0);
-    await Promise.resolve();
+    await vi.waitFor(() => expect(messages.filter((message) => message.verb === "pointer")).toHaveLength(3));
     expect(messages.filter((message) => message.verb === "selection")).toHaveLength(0);
+    expect(messages.filter((message) => message.verb === "pointer").map((message) => message.phase))
+      .toEqual(["down", "move", "up"]);
+    expect(screen.dataset.pointerSequence).toBe("3");
+    messages.length = 0;
     await providers[0].sendInput("terminal.win-test.tab-drag-1", {
       x: 15, y: 15, kind: "down", button: "left", clickCount: 1,
       modifiers: { shift: false, alt: false, control: false, meta: false },
@@ -612,8 +669,15 @@ describe("the vision surface presenter", () => {
       modifiers: { shift: false, alt: false, control: false, meta: false },
     });
     await vi.waitFor(() => expect(messages.filter((message) => message.verb === "pointer")).toHaveLength(3));
-    expect(messages.filter((message) => message.verb === "pointer").map((message) => message.phase))
-      .toEqual(["down", "move", "up"]);
+    expect(messages.filter((message) => message.verb === "pointer")).toEqual([
+      { verb: "pointer", point: { x: 15, y: 15 }, phase: "down", button: "left", clickCount: 1,
+        modifiers: { shift: false, alt: false, control: false, meta: false } },
+      { verb: "pointer", point: { x: 45, y: 15 }, phase: "move", button: "left", clickCount: 0,
+        modifiers: { shift: false, alt: false, control: false, meta: false } },
+      { verb: "pointer", point: { x: 45, y: 15 }, phase: "up", button: "left", clickCount: 1,
+        modifiers: { shift: false, alt: false, control: false, meta: false } },
+    ]);
+    expect(screen.dataset.pointerSequence).toBe("6");
     fire("pointerdown", 15, 1, true);
     fire("pointerup", 45, 0, true);
     await vi.waitFor(() => expect(messages.filter((message) => message.verb === "selection")).toHaveLength(2));
