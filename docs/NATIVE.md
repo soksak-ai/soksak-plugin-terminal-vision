@@ -39,6 +39,9 @@ A pane adds no process. The web content process is not on the hot path.
 9. Native selection is asynchronous. The presenter returns only the resolved `surface.selection`
    text and propagates a named refusal; it never returns cached empty text while an IPC request is
    still running.
+10. Pointer drag uses the engine grid and the current surface rectangle to produce exact cell/side
+    gestures. Requests are serialized under one gesture id. With engine mouse tracking active,
+    unmodified pointer input is not stolen and Shift forces local selection.
 
 The `shownlog` diagnostic command reports the count and last payload of surface frame events,
 successful state reads and failed reads per pane. A failed state delivery is recorded by name; it

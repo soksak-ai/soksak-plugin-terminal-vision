@@ -20,6 +20,11 @@ Native `read` and `selection` replies are asynchronous presenter results. The Pl
 resolved engine text or propagates the refusal; it never reports a cached empty success while an
 IPC request is still in flight.
 
+Pointer selection is event-driven. The presenter converts the current surface rectangle and
+engine grid into cell/side points, serializes begin/update/end under one gesture ID, and adopts only
+non-stale snapshots. An ungrabbed mouse selects normally; while the engine reports mouse tracking,
+Shift explicitly forces local selection. No timer or provider-name branch is used.
+
 ## Verification
 
 ```sh
