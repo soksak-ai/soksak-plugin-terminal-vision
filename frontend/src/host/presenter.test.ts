@@ -624,6 +624,10 @@ describe("the vision surface presenter", () => {
             };
           }
           if (message.verb === "pointer") return { route: "mouse-report", written: 8 };
+          if (message.verb === "focus") return {
+            focused: message.focused,
+            cursorPresentation: message.focused ? "engine" : "hollow-block",
+          };
           return {};
         },
       },
