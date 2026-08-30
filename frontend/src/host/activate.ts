@@ -19,7 +19,9 @@ interface TerminalHostEvents {
     paneId: string | null;
     grants: Array<{ id: string; kind: "file" | "image" }>;
   }) => void): { dispose(): void };
-  on(event: "terminal-surface.state", callback: (payload: { pane: string; sequence: number }) => void): { dispose(): void };
+  on(event: "terminal-surface.state", callback: (payload: {
+    pane: string; sequence: number; generation: number;
+  }) => void): { dispose(): void };
 }
 
 export interface TerminalHost extends Omit<ProviderTerminalPluginHost, "events">, Omit<SurfaceApp, "events"> {

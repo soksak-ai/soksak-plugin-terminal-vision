@@ -105,7 +105,7 @@ describe("the vision surface presenter", () => {
     const container = document.createElement("div");
     const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 1 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 1, generation: 7 })).toBe(true);
     await presenter.sendText!("ls\r");
     presenter.read(4);
     presenter.focus();
@@ -175,7 +175,7 @@ describe("the vision surface presenter", () => {
     const presenter = createVisionRenderer(app).create(
       document.createElement("div"), "tab-scroll.1", () => {}, options,
     );
-    expect(ingestTerminalSurfaceState({ pane: "tab-scroll.1", sequence: 1 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-scroll.1", sequence: 1, generation: 7 })).toBe(true);
     await vi.waitFor(() => expect(presenter.scrollState?.()).toEqual({ offset: 0, historySize: 20 }));
     const moving = presenter.scrollLines?.(5);
     expect(moving).toBeInstanceOf(Promise);
@@ -208,7 +208,7 @@ describe("the vision surface presenter", () => {
     await new Promise((resolve) => setTimeout(resolve, 250));
     expect(reads).toBe(0);
     text = "READY";
-    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 2 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 2, generation: 7 })).toBe(true);
     await expect(waiting).resolves.toBe("READY");
     expect(reads).toBe(1);
     presenter.dispose();
@@ -240,7 +240,7 @@ describe("the vision surface presenter", () => {
     const waiting = presenter.waitForText("READY", 1000);
     await Promise.resolve();
     expect(reads).toBe(0);
-    expect(ingestTerminalSurfaceState({ pane: "tab-ready.1", sequence: 1 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-ready.1", sequence: 1, generation: 7 })).toBe(true);
     await expect(waiting).resolves.toBe("READY");
     expect(reads).toBe(1);
     presenter.dispose();
@@ -264,7 +264,7 @@ describe("the vision surface presenter", () => {
     const sent = presenter.sendText!("typed-before-ready");
     await Promise.resolve();
     expect(inputs).toEqual([]);
-    expect(ingestTerminalSurfaceState({ pane: "tab-input-ready.1", sequence: 1 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-input-ready.1", sequence: 1, generation: 7 })).toBe(true);
     await sent;
     expect(inputs).toEqual(["typed-before-ready"]);
     presenter.dispose();
@@ -289,12 +289,12 @@ describe("the vision surface presenter", () => {
       document.createElement("div"), "tab-generation.1", () => {}, options,
     );
     const sent = presenter.sendText!("owned-generation");
-    expect(ingestTerminalSurfaceState({ pane: "tab-generation.1", sequence: 1 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-generation.1", sequence: 1, generation: 6 })).toBe(true);
     await Promise.resolve();
     await Promise.resolve();
     expect(inputs).toEqual([]);
     generation = 7;
-    expect(ingestTerminalSurfaceState({ pane: "tab-generation.1", sequence: 2 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-generation.1", sequence: 2, generation: 7 })).toBe(true);
     await sent;
     expect(inputs).toEqual(["owned-generation"]);
     presenter.dispose();
@@ -306,11 +306,11 @@ describe("the vision surface presenter", () => {
     const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(presenter.renderedOutputSequence!()).toBeNull();
-    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 9, cols: 120, rows: 30 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 9, generation: 7, cols: 120, rows: 30 })).toBe(true);
     expect(presenter.renderedOutputSequence!()).toBe(9);
     expect(presenter.size()).toEqual({ cols: 120, rows: 30 });
     presenter.dispose();
-    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 10 })).toBe(false);
+    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 10, generation: 7 })).toBe(false);
   });
 
   it("declares only intrinsic pane visibility and keeps host presentation on its separate axis", async () => {
@@ -373,7 +373,7 @@ describe("the vision surface presenter", () => {
     const subscription = presentation.onPresentationChanged(changed);
     const input = container.querySelector("textarea")!;
     input.focus();
-    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 9 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 9, generation: 7 })).toBe(true);
     const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
     await vi.waitFor(() => expect(screen.dataset.cursorShape).toBe("bar"));
     expect(shownLog.get("terminal.win-test.tab-a-1")).toMatchObject({
@@ -389,7 +389,7 @@ describe("the vision surface presenter", () => {
       cursorActive: "false",
     });
     phase = "on";
-    ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 10 });
+    ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 10, generation: 7 });
     await vi.waitFor(() => expect(screen.dataset.cursorAnimationPhase).toBe("on"));
     expect(screen.dataset.cursorActive).toBe("true");
     expect(changed).toHaveBeenCalled();
@@ -465,7 +465,7 @@ describe("the vision surface presenter", () => {
     ) as ReturnType<ReturnType<typeof createVisionRenderer>["create"]> & {
       themeStatus(): { terminalOverrides: { background: string | null } };
     };
-    expect(ingestTerminalSurfaceState({ pane: "tab-order.1", sequence: 1 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-order.1", sequence: 1, generation: 7 })).toBe(true);
     await vi.waitFor(() => expect(presenter.themeStatus().terminalOverrides.background).toBe("#234567"));
     presenter.dispose();
   });
@@ -543,7 +543,7 @@ describe("the vision surface presenter", () => {
     const container = document.createElement("div");
     document.body.append(container);
     const presenter = createVisionRenderer(app).create(container, "tab-native-drag.1", () => {}, options);
-    expect(ingestTerminalSurfaceState({ pane: "tab-native-drag.1", sequence: 1 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-native-drag.1", sequence: 1, generation: 7 })).toBe(true);
     const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
     screen.getBoundingClientRect = () => ({
       x: 0, y: 0, left: 0, top: 0, right: 100, bottom: 50,
@@ -596,7 +596,7 @@ describe("the vision surface presenter", () => {
     });
     const container = document.createElement("div");
     const presenter = createVisionRenderer(app).create(container, "tab-wheel.1", () => {}, options);
-    expect(ingestTerminalSurfaceState({ pane: "tab-wheel.1", sequence: 1 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-wheel.1", sequence: 1, generation: 7 })).toBe(true);
     const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
     await vi.waitFor(() => expect(screen.dataset.surfaceReady).toBe("true"));
     await providers[0].sendWheel("terminal.win-test.tab-wheel-1", {
@@ -656,7 +656,7 @@ describe("the vision surface presenter", () => {
     });
     const container = document.createElement("div");
     const presenter = createVisionRenderer(app).create(container, "tab-input-order.1", () => {}, options);
-    expect(ingestTerminalSurfaceState({ pane: "tab-input-order.1", sequence: 1 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-input-order.1", sequence: 1, generation: 7 })).toBe(true);
     await vi.waitFor(() => expect(container.querySelector<HTMLElement>("[data-native-surface]")!
       .dataset.mouseTracking).toBe("true"));
     const pointer = providers[0].sendInput("terminal.win-test.tab-input-order-1", {
@@ -716,7 +716,7 @@ describe("the vision surface presenter", () => {
       x: 0, y: 0, left: 0, top: 0, right: 100, bottom: 50,
       width: 100, height: 50, toJSON: () => ({}),
     });
-    expect(ingestTerminalSurfaceState({ pane: "tab-drag.1", sequence: 1 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-drag.1", sequence: 1, generation: 7 })).toBe(true);
     await vi.waitFor(() => expect(screen.dataset.surfaceReady).toBe("true"));
     const fire = (type: string, x: number, buttons: number, shiftKey = false) => screen.dispatchEvent(new MouseEvent(type, {
       clientX: x, clientY: 15, button: 0, buttons, detail: 1, shiftKey, bubbles: true, cancelable: true,
@@ -735,7 +735,7 @@ describe("the vision surface presenter", () => {
     expect(new Set(selection.map((message) => message.gestureId)).size).toBe(1);
 
     grabbed = true;
-    expect(ingestTerminalSurfaceState({ pane: "tab-drag.1", sequence: 2 })).toBe(true);
+    expect(ingestTerminalSurfaceState({ pane: "tab-drag.1", sequence: 2, generation: 7 })).toBe(true);
     await vi.waitFor(() => expect(screen.dataset.mouseTracking).toBe("true"));
     messages.length = 0;
     fire("pointerdown", 15, 1);

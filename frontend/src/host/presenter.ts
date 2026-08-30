@@ -57,7 +57,9 @@ export interface SurfaceApp {
   }): () => void;
   settings?: { get(key: string): unknown };
   events?: {
-    on(event: "terminal-surface.state", listener: (payload: { pane: string; sequence: number }) => void): { dispose(): void };
+    on(event: "terminal-surface.state", listener: (payload: {
+      pane: string; sequence: number; generation: number;
+    }) => void): { dispose(): void };
   };
 }
 
@@ -818,6 +820,12 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         const observation = logOf(label);
         observation.stateEvents += 1;
         observation.lastEvent = { ...payload };
+        if (payload.generation !== generation) {
+          observation.stateFailures += 1;
+          observation.lastError = `terminal surface ${pane} event does not belong to generation ${generation}`;
+          for (const listener of stateEventListeners) listener();
+          return;
+        }
         ingest(payload);
         // The event is the frame edge. Read the richer service-owned state once at that edge;
         // no timer or polling loop reconstructs cols/rows from the DOM.
