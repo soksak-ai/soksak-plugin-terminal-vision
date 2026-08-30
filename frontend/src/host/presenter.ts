@@ -853,6 +853,11 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       };
 
       let disposed = false;
+      const awaitSurfaceOwner = async () => {
+        if (!surfaceStateReady && !await surfaceReady) {
+          throw new Error(`terminal surface ${pane} was disposed before it became ready`);
+        }
+      };
       return {
         root: container,
         size: () => ({ cols: state.cols, rows: state.rows }),
@@ -872,10 +877,9 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           void deliver({ verb: "resize", pixelW: next.width, pixelH: next.height, scale })
             .catch(() => {});
         },
+        ready: awaitSurfaceOwner,
         sendText: async (data) => {
-          if (!surfaceStateReady && !await surfaceReady) {
-            throw new Error(`terminal surface ${pane} was disposed before it became ready`);
-          }
+          await awaitSurfaceOwner();
           await deliver({ verb: "input", data });
         },
         renderedOutputSequence: () => state.sequence,
