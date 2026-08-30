@@ -888,6 +888,12 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         ready: awaitSurfaceOwner,
         sendText: async (data) => {
           await awaitSurfaceOwner();
+          // Selection belongs to the engine grid. The first confirmed input after a copy must
+          // retire that overlay before the PTY can mutate cells under it; otherwise row damage
+          // repaints input while preserving stale selection colors over the previous frame.
+          if (state.selection.active) {
+            await enqueueSelection({ action: "clear" });
+          }
           await deliver({ verb: "input", data });
         },
         renderedOutputSequence: () => state.sequence,

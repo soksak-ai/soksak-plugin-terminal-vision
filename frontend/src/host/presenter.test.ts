@@ -127,6 +127,35 @@ describe("the vision surface presenter", () => {
     expect(verbs).not.toContain("stop");
   });
 
+  it("clears an active engine selection before confirmed terminal input", async () => {
+    const { app, delivered } = fakeApp();
+    const presenter = createVisionRenderer(app).create(
+      document.createElement("div"), "tab-input-selection.1", () => {}, options,
+    );
+    expect(ingestTerminalSurfaceState({
+      pane: "tab-input-selection.1", sequence: 1, generation: 7,
+      selection: {
+        active: true, text: "copied", kind: "simple", gestureId: "selection-1",
+        anchor: { row: 1, col: 0, side: "left" },
+        focus: { row: 1, col: 5, side: "right" }, sequence: 1,
+      },
+    })).toBe(true);
+
+    await presenter.sendText!("\x7f");
+
+    expect(delivered.map(({ message }) => message)).toContainEqual({
+      verb: "selection", action: "clear",
+    });
+    const transaction = delivered
+      .map(({ message }) => message)
+      .filter((message) => message.verb === "selection" || message.verb === "input");
+    expect(transaction).toEqual([
+      { verb: "selection", action: "clear" },
+      { verb: "input", data: "\x7f" },
+    ]);
+    presenter.dispose();
+  });
+
   it("awaits the native read and returns the requested trailing lines", async () => {
     const { app } = fakeApp();
     const presenter = createVisionRenderer(app).create(
