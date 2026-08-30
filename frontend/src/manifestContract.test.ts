@@ -12,7 +12,7 @@ describe("terminal plugin manifest contract", () => {
     expect(manifest.version).toBe(pkg.version);
     expect(pkg.dependencies).toEqual({
       "@soksak/soksak-contract-plugin-terminal": "0.0.19",
-      "@soksak/soksak-kit-plugin-terminal": "0.0.95",
+      "@soksak/soksak-kit-plugin-terminal": "0.0.96",
     });
     expect(manifest).not.toHaveProperty("spec");
     expect(manifest.appVersionRequirement).toBe("0.0.1");
