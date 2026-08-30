@@ -18,6 +18,10 @@ document.documentElement.dataset.themeMode = "dark";
 
 interface Delivered { label: string; message: Record<string, unknown> }
 
+const ownedState = (value: Record<string, unknown> = {}) => ({
+  generation: 7, phase: "live", session: 1, ...value,
+});
+
 function fakeApp(overrides: Partial<SurfaceApp> = {}) {
   const delivered: Delivered[] = [];
   const providers: Parameters<NonNullable<SurfaceApp["provideSurfaceInput"]>>[0][] = [];
@@ -35,7 +39,9 @@ function fakeApp(overrides: Partial<SurfaceApp> = {}) {
           focused: message.focused === true,
           cursorPresentation: message.focused === true ? "engine" : "hollow-block",
         };
-        if (message.verb === "state") return { sequence: 3, cols: 80, rows: 24 };
+        if (message.verb === "state") return {
+          generation: 7, phase: "live", session: 1, sequence: 3, cols: 80, rows: 24,
+        };
         return {};
       },
     },
@@ -52,6 +58,7 @@ function fakeApp(overrides: Partial<SurfaceApp> = {}) {
 
 const options = {
   nodeSuffix: "1",
+  containerGeneration: 7,
   hostPixels: () => ({ width: 640, height: 384 }),
   requestViewport: () => {},
 };
@@ -65,6 +72,7 @@ describe("the vision surface presenter", () => {
     const screen = container.querySelector('[data-native-surface="terminal"]');
     expect(screen).not.toBeNull();
     expect(screen!.getAttribute("data-native-surface-id")).toBe("terminal.win-test.tab-a-2");
+    expect(screen!.getAttribute("data-native-generation")).toBe("7");
     const source = JSON.parse(screen!.getAttribute("data-native-source")!);
     expect(source.pane).toBe("tab-a.2");
     expect(source.window).toBe("win-test");
@@ -154,7 +162,7 @@ describe("the vision surface presenter", () => {
       surface: {
         label: (kind, viewId) => `${kind}.win-test.${viewId}`,
         deliver: async (_label, message) => {
-          if (message.verb === "state") return { sequence: 1, cols: 10, rows: 5, offset: 0, historySize: 20 };
+          if (message.verb === "state") return ownedState({ sequence: 1, cols: 10, rows: 5, offset: 0, historySize: 20 });
           if (message.verb === "scroll") {
             await held;
             return { sequence: 2, cols: 10, rows: 5, offset: 5, historySize: 20 };
@@ -186,7 +194,7 @@ describe("the vision surface presenter", () => {
         label: (kind, viewId) => `${kind}.win-test.${viewId}`,
         deliver: async (_label, message) => {
           if (message.verb === "read") { reads += 1; return { text }; }
-          if (message.verb === "state") return { sequence: 1, cols: 80, rows: 24 };
+          if (message.verb === "state") return ownedState({ sequence: 1, cols: 80, rows: 24 });
           return {};
         },
       },
@@ -215,7 +223,7 @@ describe("the vision surface presenter", () => {
         deliver: async (_label, message) => {
           if (message.verb === "state") {
             ready = true;
-            return { sequence: 1, cols: 80, rows: 24 };
+            return ownedState({ sequence: 1, cols: 80, rows: 24 });
           }
           if (message.verb === "read") {
             reads += 1;
@@ -244,7 +252,7 @@ describe("the vision surface presenter", () => {
       surface: {
         label: (kind, viewId) => `${kind}.win-test.${viewId}`,
         deliver: async (_label, message) => {
-          if (message.verb === "state") return { sequence: 1, cols: 80, rows: 24 };
+          if (message.verb === "state") return ownedState({ sequence: 1, cols: 80, rows: 24 });
           if (message.verb === "input") inputs.push(String(message.data));
           return {};
         },
@@ -259,6 +267,36 @@ describe("the vision surface presenter", () => {
     expect(ingestTerminalSurfaceState({ pane: "tab-input-ready.1", sequence: 1 })).toBe(true);
     await sent;
     expect(inputs).toEqual(["typed-before-ready"]);
+    presenter.dispose();
+  });
+
+  it("does not let an older native generation satisfy readiness", async () => {
+    let generation = 6;
+    const inputs: string[] = [];
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => {
+          if (message.verb === "state") return {
+            generation, phase: "live", session: 1, sequence: 1, cols: 80, rows: 24,
+          };
+          if (message.verb === "input") inputs.push(String(message.data));
+          return {};
+        },
+      },
+    });
+    const presenter = createVisionRenderer(app).create(
+      document.createElement("div"), "tab-generation.1", () => {}, options,
+    );
+    const sent = presenter.sendText!("owned-generation");
+    expect(ingestTerminalSurfaceState({ pane: "tab-generation.1", sequence: 1 })).toBe(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(inputs).toEqual([]);
+    generation = 7;
+    expect(ingestTerminalSurfaceState({ pane: "tab-generation.1", sequence: 2 })).toBe(true);
+    await sent;
+    expect(inputs).toEqual(["owned-generation"]);
     presenter.dispose();
   });
 
@@ -315,12 +353,12 @@ describe("the vision surface presenter", () => {
               cursorPresentation: message.focused === true ? "engine" : "hollow-block",
             };
           }
-          return message.verb === "state" ? {
+          return message.verb === "state" ? ownedState({
             sequence: 9, cols: 120, rows: 30,
             cursorRow: 3, cursorColumn: 7, cursorVisible: true,
             cursorShape: "bar", cursorBlinking: true,
             cursorAnimation: { intervalMs: 750, phase },
-          } : {};
+          }) : {};
         },
       },
     });
@@ -417,9 +455,9 @@ describe("the vision surface presenter", () => {
     const { app } = fakeApp({
       surface: {
         label: (kind, viewId) => `${kind}.win-test.${viewId}`,
-        deliver: async (_label, message) => message.verb === "state" ? {
+        deliver: async (_label, message) => message.verb === "state" ? ownedState({
           themeMode: "dark", baseTheme, terminalOverrides, effectiveTheme: reorderedEffective,
-        } : {},
+        }) : {},
       },
     });
     const presenter = createVisionRenderer(app).create(
@@ -484,13 +522,13 @@ describe("the vision surface presenter", () => {
         label: (kind, viewId) => `${kind}.win-test.${viewId}`,
         deliver: async (_label, message) => {
           messages.push(message);
-          if (message.verb === "state") return {
+          if (message.verb === "state") return ownedState({
             sequence: 1, cols: 10, rows: 5,
             modes: {
               mouseClick: false, mouseDrag: false, mouseMotion: false,
               sgrMouse: false, utf8Mouse: false, alternateScroll: false,
             },
-          };
+          });
           if (message.verb === "selection") {
             selectionSequence += 1;
             return {
@@ -548,7 +586,7 @@ describe("the vision surface presenter", () => {
         label: (kind, viewId) => `${kind}.win-test.${viewId}`,
         deliver: async (_label, message) => {
           messages.push(message);
-          if (message.verb === "state") return { sequence: 1, cols: 10, rows: 5 };
+          if (message.verb === "state") return ownedState({ sequence: 1, cols: 10, rows: 5 });
           if (message.verb === "wheel") return {
             route: "scrollback", offset: 2, historySize: 20, written: 0,
           };
@@ -595,13 +633,13 @@ describe("the vision surface presenter", () => {
       surface: {
         label: (kind, viewId) => `${kind}.win-test.${viewId}`,
         deliver: async (_label, message) => {
-          if (message.verb === "state") return {
+          if (message.verb === "state") return ownedState({
             sequence: 1, cols: 10, rows: 5,
             modes: {
               mouseClick: true, mouseDrag: true, mouseMotion: false,
               sgrMouse: true, utf8Mouse: false, alternateScroll: false,
             },
-          };
+          });
           if (message.verb === "pointer") {
             order.push("pointer:start");
             await pointerHeld;
@@ -647,13 +685,13 @@ describe("the vision surface presenter", () => {
         label: (kind, viewId) => `${kind}.win-test.${viewId}`,
         deliver: async (_label, message) => {
           messages.push(message);
-          if (message.verb === "state") return {
+          if (message.verb === "state") return ownedState({
             sequence: 1, cols: 10, rows: 5,
             modes: {
               mouseClick: grabbed, mouseDrag: grabbed, mouseMotion: false,
               sgrMouse: false, utf8Mouse: false, alternateScroll: false,
             },
-          };
+          });
           if (message.verb === "selection") {
             selectionSequence += 1;
             return {

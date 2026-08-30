@@ -365,7 +365,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       // declarations must not invent separate insets; the compositor compares both in the same
       // CSS coordinate space and any border belongs to the shared presentation layer.
       Object.assign(screen.style, { position: "absolute", inset: "0" });
-      const generation = 1;
+      const generation = options.containerGeneration;
       let declared = false;
       // Workbench pane visibility is intrinsic to this Plugin declaration. Core view visibility
       // lives on the host ancestor and is never copied here. dim remains native alpha because the
@@ -824,6 +824,12 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         void deliver({ verb: "state" }).then((reply) => {
           observation.stateReads += 1;
           observation.lastRead = { ...reply };
+          if (reply.generation !== generation || reply.phase !== "live"
+            || !Number.isSafeInteger(reply.session) || Number(reply.session) < 1) {
+            observation.stateFailures += 1;
+            observation.lastError = `terminal surface ${pane} state does not belong to generation ${generation}`;
+            return;
+          }
           observation.lastError = null;
           ingest(reply);
           surfaceStateReady = true;
