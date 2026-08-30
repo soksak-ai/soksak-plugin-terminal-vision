@@ -41,7 +41,7 @@ describe("terminal plugin manifest contract", () => {
       { id: "soksak-sidecar-terminal-kitty", version: "0.0.33" },
       { id: "soksak-sidecar-terminal-shitty", version: "0.0.32" },
       { id: "soksak-sidecar-terminal-vt100", version: "0.0.37" },
-      { id: "soksak-sidecar-terminal-wezterm", version: "0.0.35" },
+      { id: "soksak-sidecar-terminal-wezterm", version: "0.0.36" },
     ]);
 
     const setting = (key: string) => manifest.configuration.find((item: { key: string }) => item.key === key);
