@@ -124,7 +124,7 @@ describe("the vision surface presenter", () => {
     expect(verbs).toContain("selection");
     expect(delivered.find((entry) => entry.message.verb === "scroll" && entry.message.offset === 5)).toBeTruthy();
     expect(delivered.find((entry) => entry.message.verb === "scroll" && entry.message.lines === -3)).toBeTruthy();
-    expect(delivered.at(-1)!.message).toEqual({ verb: "stop", intent: "detach" });
+    expect(verbs).not.toContain("stop");
   });
 
   it("awaits the native read and returns the requested trailing lines", async () => {

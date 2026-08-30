@@ -1015,7 +1015,6 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           presentationListeners.clear();
           screen.remove();
           input.remove();
-          void deliver({ verb: "stop", intent: "detach" }).catch(() => {});
         },
       };
     },

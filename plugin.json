@@ -4,7 +4,7 @@
     "en": "Vision Terminal",
     "ko": "Vision 터미널"
   },
-  "version": "0.0.44",
+  "version": "0.0.45",
   "appVersionRequirement": "0.0.1",
   "description": {
     "en": "A terminal whose pixels are painted by its render sidecar into a native surface.",
