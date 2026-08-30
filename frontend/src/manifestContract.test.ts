@@ -37,7 +37,7 @@ describe("terminal plugin manifest contract", () => {
     expect(manifest.runtimeDependencies.sidecars).toEqual([
       { id: "soksak-sidecar-pty", version: "0.0.20" },
       { id: "soksak-sidecar-terminal-alacritty", version: "0.0.40" },
-      { id: "soksak-sidecar-terminal-ghostty", version: "0.0.36" },
+      { id: "soksak-sidecar-terminal-ghostty", version: "0.0.37" },
       { id: "soksak-sidecar-terminal-kitty", version: "0.0.33" },
       { id: "soksak-sidecar-terminal-shitty", version: "0.0.32" },
       { id: "soksak-sidecar-terminal-vt100", version: "0.0.37" },
