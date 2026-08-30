@@ -1,5 +1,11 @@
 # Change log
 
+## 0.0.58
+
+- Select terminal Contract 0.0.21 and Kit 0.0.101.
+- Expose event-driven wait predicates for theme, viewport history, scroll position,
+  follow mode, accepted input, and confirmed PTY writes.
+
 ## 0.0.57
 
 - Select the exact final terminal release train: PTY 0.0.22, Alacritty 0.0.42,

@@ -1,5 +1,11 @@
 # 변경 기록
 
+## 0.0.58
+
+- 터미널 Contract 0.0.21과 Kit 0.0.101을 선택합니다.
+- 테마, viewport history, scroll 위치, follow mode, 입력 수락, PTY write 확인을
+  폴링 없이 기다리는 조건을 공개합니다.
+
 ## 0.0.57
 
 - PTY 0.0.22, Alacritty 0.0.42, Ghostty 0.0.40, Kitty 0.0.36, Shitty
