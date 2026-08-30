@@ -360,6 +360,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         fontPt: String(settingNumber("fontSize", 13)),
         theme: JSON.stringify(surfaceThemeFromStatus(initialThemeStatus)),
         shell: "",
+        ...(options.cwd ? { cwd: options.cwd } : {}),
       };
       const screen = document.createElement("div");
       screen.dataset.node = terminalNodeId("terminal-screen", options.nodeSuffix);
