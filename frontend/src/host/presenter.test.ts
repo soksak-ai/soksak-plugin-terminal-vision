@@ -147,6 +147,37 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
+  it("awaits the native scroll reply before publishing the new viewport", async () => {
+    let releaseScroll!: () => void;
+    const held = new Promise<void>((resolve) => { releaseScroll = resolve; });
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => {
+          if (message.verb === "state") return { sequence: 1, cols: 10, rows: 5, offset: 0, historySize: 20 };
+          if (message.verb === "scroll") {
+            await held;
+            return { sequence: 2, cols: 10, rows: 5, offset: 5, historySize: 20 };
+          }
+          if (message.verb === "focus") return { focused: message.focused, cursorPresentation: "engine" };
+          return {};
+        },
+      },
+    });
+    const presenter = createVisionRenderer(app).create(
+      document.createElement("div"), "tab-scroll.1", () => {}, options,
+    );
+    expect(ingestTerminalSurfaceState({ pane: "tab-scroll.1", sequence: 1 })).toBe(true);
+    await vi.waitFor(() => expect(presenter.scrollState?.()).toEqual({ offset: 0, historySize: 20 }));
+    const moving = presenter.scrollLines?.(5);
+    expect(moving).toBeInstanceOf(Promise);
+    expect(presenter.scrollState?.()).toEqual({ offset: 0, historySize: 20 });
+    releaseScroll();
+    await moving;
+    expect(presenter.scrollState?.()).toEqual({ offset: 5, historySize: 20 });
+    presenter.dispose();
+  });
+
   it("waits for text from surface state events without polling", async () => {
     let text = "";
     let reads = 0;

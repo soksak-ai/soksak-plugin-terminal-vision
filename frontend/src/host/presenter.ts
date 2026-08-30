@@ -967,12 +967,11 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           }
         },
         scrollState: () => ({ offset: state.offset, historySize: state.historySize }),
-        scrollLines(lines) {
-          void deliver({ verb: "scroll", lines }).then(ingest).catch(() => {});
+        async scrollLines(lines) {
+          ingest(await deliver({ verb: "scroll", lines }));
         },
-        scrollTo(offset) {
-          state.offset = offset;
-          void deliver({ verb: "scroll", offset }).then(ingest).catch(() => {});
+        async scrollTo(offset) {
+          ingest(await deliver({ verb: "scroll", offset }));
         },
         dispose() {
           if (disposed) return;
