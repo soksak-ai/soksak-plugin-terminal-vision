@@ -1,7 +1,12 @@
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { TERMINAL_PLUGIN_CONTRACT, TERMINAL_PLUGIN_NODES, validateTerminalPluginManifestCommands } from "@soksak/soksak-contract-plugin-terminal";
+import {
+  TERMINAL_PLUGIN_COMMAND_SCHEMAS,
+  TERMINAL_PLUGIN_CONTRACT,
+  TERMINAL_PLUGIN_NODES,
+  validateTerminalPluginManifestCommands,
+} from "@soksak/soksak-contract-plugin-terminal";
 
 describe("terminal plugin manifest contract", () => {
   it("declares every common terminal command, the native surface, and its runtime dependencies", () => {
@@ -11,13 +16,20 @@ describe("terminal plugin manifest contract", () => {
     expect(manifest.name).toEqual({ en: "Vision Terminal", ko: "Vision 터미널" });
     expect(manifest.version).toBe(pkg.version);
     expect(pkg.dependencies).toEqual({
-      "@soksak/soksak-contract-plugin-terminal": "0.0.19",
-      "@soksak/soksak-kit-plugin-terminal": "0.0.100",
+      "@soksak/soksak-contract-plugin-terminal": "0.0.21",
+      "@soksak/soksak-kit-plugin-terminal": "0.0.101",
     });
     expect(manifest).not.toHaveProperty("spec");
     expect(manifest.appVersionRequirement).toBe("0.0.1");
     expect(manifest.entry).toBe("main.js");
-    expect(manifest.implements).toEqual([TERMINAL_PLUGIN_CONTRACT]);
+    expect(manifest.implements).toEqual([{ id: "soksak-spec-plugin-terminal", version: "0.0.21" }]);
+    expect(TERMINAL_PLUGIN_CONTRACT).toEqual({ id: "soksak-spec-plugin-terminal", version: "0.0.21" });
+
+    const wait = TERMINAL_PLUGIN_COMMAND_SCHEMAS.wait.input.properties;
+    for (const predicate of [
+      "themeMode", "effectiveBackground", "historySize", "minHistorySize", "offset", "followMode",
+      "acceptedInputSequenceGreaterThan", "ptyWriteSequenceGreaterThan",
+    ]) expect(wait).toHaveProperty(predicate);
 
     // The surface permission opens the label, the deliver verb and the pointer provider. The
     // webview permission would show a person a consent sentence about a web view this plugin
