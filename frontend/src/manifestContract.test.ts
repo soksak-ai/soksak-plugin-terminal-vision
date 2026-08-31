@@ -16,14 +16,14 @@ describe("terminal plugin manifest contract", () => {
     expect(manifest.name).toEqual({ en: "Vision Terminal", ko: "Vision 터미널" });
     expect(manifest.version).toBe(pkg.version);
     expect(pkg.dependencies).toEqual({
-      "@soksak/soksak-contract-plugin-terminal": "0.0.21",
-      "@soksak/soksak-kit-plugin-terminal": "0.0.101",
+      "@soksak/soksak-contract-plugin-terminal": "0.0.22",
+      "@soksak/soksak-kit-plugin-terminal": "0.0.103",
     });
     expect(manifest).not.toHaveProperty("spec");
     expect(manifest.appVersionRequirement).toBe("0.0.1");
     expect(manifest.entry).toBe("main.js");
-    expect(manifest.implements).toEqual([{ id: "soksak-spec-plugin-terminal", version: "0.0.21" }]);
-    expect(TERMINAL_PLUGIN_CONTRACT).toEqual({ id: "soksak-spec-plugin-terminal", version: "0.0.21" });
+    expect(manifest.implements).toEqual([{ id: "soksak-spec-plugin-terminal", version: "0.0.22" }]);
+    expect(TERMINAL_PLUGIN_CONTRACT).toEqual({ id: "soksak-spec-plugin-terminal", version: "0.0.22" });
 
     const wait = TERMINAL_PLUGIN_COMMAND_SCHEMAS.wait.input.properties;
     for (const predicate of [
