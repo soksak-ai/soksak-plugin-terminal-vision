@@ -890,6 +890,34 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
+  it("clears selection and the hidden buffer for clipboard paste", async () => {
+    const { app, delivered } = fakeApp();
+    const sent: string[] = [];
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(
+      container, "tab-input-paste-selection.1", (text) => sent.push(text), options,
+    );
+    expect(ingestTerminalSurfaceState({
+      pane: "tab-input-paste-selection.1", sequence: 1, generation: 7,
+      selection: {
+        active: true, text: "copied", kind: "simple", gestureId: "selection-3",
+        anchor: { row: 1, col: 0, side: "left" },
+        focus: { row: 1, col: 5, side: "right" }, sequence: 1,
+      },
+    })).toBe(true);
+    const input = container.querySelector("textarea")!;
+    input.value = "stale";
+    const paste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, "clipboardData", { value: { getData: () => "pasted" } });
+    input.dispatchEvent(paste);
+    await vi.waitFor(() => expect(sent).toEqual(["pasted"]));
+    expect(input.value).toBe("");
+    expect(delivered.map(({ message }) => message).filter((message) => message.verb === "selection")).toEqual([
+      { verb: "selection", action: "clear" },
+    ]);
+    presenter.dispose();
+  });
+
   it("refuses by name when the surface capability is absent", async () => {
     const { app } = fakeApp({ surface: undefined });
     const container = document.createElement("div");
