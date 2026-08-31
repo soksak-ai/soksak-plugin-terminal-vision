@@ -186,7 +186,7 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
-  it("awaits the native scroll reply before publishing the new viewport", async () => {
+  it("awaits the native scroll reply and publishes the viewport state event", async () => {
     let releaseScroll!: () => void;
     const held = new Promise<void>((resolve) => { releaseScroll = resolve; });
     const { app } = fakeApp({
@@ -206,14 +206,22 @@ describe("the vision surface presenter", () => {
     const presenter = createVisionRenderer(app).create(
       document.createElement("div"), "tab-scroll.1", () => {}, options,
     );
+    const changed = vi.fn();
+    const presentation = presenter as typeof presenter & {
+      onPresentationChanged(callback: () => void): { dispose(): void };
+    };
+    const subscription = presentation.onPresentationChanged(changed);
     expect(ingestTerminalSurfaceState({ pane: "tab-scroll.1", sequence: 1, generation: 7 })).toBe(true);
     await vi.waitFor(() => expect(presenter.scrollState?.()).toEqual({ offset: 0, historySize: 20 }));
+    changed.mockClear();
     const moving = presenter.scrollLines?.(5);
     expect(moving).toBeInstanceOf(Promise);
     expect(presenter.scrollState?.()).toEqual({ offset: 0, historySize: 20 });
     releaseScroll();
     await moving;
     expect(presenter.scrollState?.()).toEqual({ offset: 5, historySize: 20 });
+    expect(changed).toHaveBeenCalledTimes(1);
+    subscription.dispose();
     presenter.dispose();
   });
 
