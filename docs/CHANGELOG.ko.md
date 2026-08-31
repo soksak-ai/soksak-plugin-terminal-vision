@@ -1,5 +1,10 @@
 # 변경 기록
 
+## 0.0.59
+
+- 네이티브 history와 viewport offset 변경을 event-driven terminal wait가
+  구독하는 동일한 presentation event로 발행합니다.
+
 ## 0.0.58
 
 - 터미널 Contract 0.0.21과 Kit 0.0.101을 선택합니다.

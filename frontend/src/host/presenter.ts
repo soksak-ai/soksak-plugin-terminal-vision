@@ -493,11 +493,18 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       };
       adoptSelection(state.selection);
       const ingest = (payload: Record<string, unknown>) => {
+        let presentationChanged = false;
         if (typeof payload.sequence === "number") state.sequence = Math.max(state.sequence ?? 0, payload.sequence);
         if (typeof payload.cols === "number") state.cols = payload.cols;
         if (typeof payload.rows === "number") state.rows = payload.rows;
-        if (typeof payload.offset === "number") state.offset = payload.offset;
-        if (typeof payload.historySize === "number") state.historySize = payload.historySize;
+        if (typeof payload.offset === "number" && state.offset !== payload.offset) {
+          state.offset = payload.offset;
+          presentationChanged = true;
+        }
+        if (typeof payload.historySize === "number" && state.historySize !== payload.historySize) {
+          state.historySize = payload.historySize;
+          presentationChanged = true;
+        }
         if (typeof payload.text === "string") state.text = payload.text;
         const nextModes = surfaceModes(payload.modes);
         if (nextModes) {
@@ -508,7 +515,6 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           screen.dataset.alternateScroll = String(nextModes.alternateScroll);
         }
         adoptSelection(payload.selection);
-        let presentationChanged = false;
         const setCursorNumber = (key: "cursorRow" | "cursorColumn", value: unknown) => {
           if (!Number.isSafeInteger(value) || Number(value) < 0 || state[key] === Number(value)) return;
           state[key] = Number(value);

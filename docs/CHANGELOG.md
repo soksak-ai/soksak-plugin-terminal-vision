@@ -1,5 +1,10 @@
 # Change log
 
+## 0.0.59
+
+- Publish native history and viewport offset changes through the same
+  presentation event used by event-driven terminal wait predicates.
+
 ## 0.0.58
 
 - Select terminal Contract 0.0.21 and Kit 0.0.101.
