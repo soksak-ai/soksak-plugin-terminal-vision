@@ -364,6 +364,8 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       };
       const screen = document.createElement("div");
       screen.dataset.node = terminalNodeId("terminal-screen", options.nodeSuffix);
+      screen.setAttribute("role", "log");
+      screen.setAttribute("aria-live", "polite");
       // The native surface follows the pane's exact content geometry. Browser and terminal
       // declarations must not invent separate insets; the compositor compares both in the same
       // CSS coordinate space and any border belongs to the shared presentation layer.
@@ -398,7 +400,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       });
       const input = document.createElement("textarea");
       input.dataset.node = terminalNodeId("terminal-input", options.nodeSuffix);
-      input.setAttribute("aria-label", "terminal input");
+      input.setAttribute("aria-label", "Terminal input");
       Object.assign(input.style, {
         position: "absolute", left: "0", top: "0", width: "1px", height: "1px",
         opacity: "0", border: "0", padding: "0", resize: "none",

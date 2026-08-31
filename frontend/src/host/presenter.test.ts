@@ -371,6 +371,18 @@ describe("the vision surface presenter", () => {
     expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 10, generation: 7 })).toBe(false);
   });
 
+  it("publishes terminal accessibility semantics on the public nodes", () => {
+    const { app } = fakeApp();
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-accessibility.1", () => {}, options);
+    const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
+    const input = container.querySelector<HTMLElement>('[data-node="terminal-input/1"]')!;
+    expect(screen.getAttribute("role")).toBe("log");
+    expect(screen.getAttribute("aria-live")).toBe("polite");
+    expect(input.getAttribute("aria-label")).toBe("Terminal input");
+    presenter.dispose();
+  });
+
   it("declares only intrinsic pane visibility and keeps host presentation on its separate axis", async () => {
     const { app } = fakeApp();
     const container = document.createElement("div");
