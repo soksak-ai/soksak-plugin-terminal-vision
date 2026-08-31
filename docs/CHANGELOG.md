@@ -1,5 +1,9 @@
 # Change log
 
+## 0.0.60
+
+- Select Alacritty 0.0.46 so public terminal reads preserve combining codepoints.
+
 ## 0.0.59
 
 - Publish native history and viewport offset changes through the same
