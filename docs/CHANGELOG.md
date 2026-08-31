@@ -4,6 +4,10 @@
 
 - Publish native history and viewport offset changes through the same
   presentation event used by event-driven terminal wait predicates.
+- Select PTY 0.0.22 and the six immutable engine releases produced from their current source:
+  Alacritty 0.0.43, Ghostty 0.0.41, Kitty 0.0.37, Shitty 0.0.38, VT100 0.0.40,
+  and WezTerm 0.0.39.
+- Build and attest the release with SDK 0.0.20.
 
 ## 0.0.58
 

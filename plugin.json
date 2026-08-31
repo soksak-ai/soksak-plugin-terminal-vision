@@ -368,27 +368,27 @@
       },
       {
         "id": "soksak-sidecar-terminal-alacritty",
-        "version": "0.0.42"
+        "version": "0.0.43"
       },
       {
         "id": "soksak-sidecar-terminal-ghostty",
-        "version": "0.0.40"
+        "version": "0.0.41"
       },
       {
         "id": "soksak-sidecar-terminal-kitty",
-        "version": "0.0.36"
-      },
-      {
-        "id": "soksak-sidecar-terminal-shitty",
         "version": "0.0.37"
       },
       {
+        "id": "soksak-sidecar-terminal-shitty",
+        "version": "0.0.38"
+      },
+      {
         "id": "soksak-sidecar-terminal-vt100",
-        "version": "0.0.39"
+        "version": "0.0.40"
       },
       {
         "id": "soksak-sidecar-terminal-wezterm",
-        "version": "0.0.38"
+        "version": "0.0.39"
       }
     ]
   }

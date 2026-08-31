@@ -4,6 +4,10 @@
 
 - 네이티브 history와 viewport offset 변경을 event-driven terminal wait가
   구독하는 동일한 presentation event로 발행합니다.
+- PTY 0.0.22와 현재 소스에서 생성한 6개 불변 엔진 릴리스를 선택합니다: Alacritty
+  0.0.43, Ghostty 0.0.41, Kitty 0.0.37, Shitty 0.0.38, VT100 0.0.40,
+  WezTerm 0.0.39.
+- SDK 0.0.20으로 릴리스를 빌드하고 증명합니다.
 
 ## 0.0.58
 
