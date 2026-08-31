@@ -104,7 +104,7 @@ describe("the vision surface presenter", () => {
   });
 
   it("returns the exact grid applied by surface resize", async () => {
-    const { app } = fakeApp();
+    const { app, delivered } = fakeApp();
     let width = 640;
     const container = document.createElement("div");
     const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, {
@@ -113,7 +113,10 @@ describe("the vision surface presenter", () => {
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
     width = 739;
-    await expect(presenter.fit?.()).resolves.toEqual({ cols: 94, rows: 30 });
+    const fitted = presenter.fit?.();
+    expect(delivered.some(({ message }) => message.verb === "resize")).toBe(false);
+    expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 1, generation: 7 })).toBe(true);
+    await expect(fitted).resolves.toEqual({ cols: 94, rows: 30 });
     presenter.dispose();
   });
 

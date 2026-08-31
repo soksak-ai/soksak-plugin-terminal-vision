@@ -878,6 +878,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         size: () => ({ cols: state.cols, rows: state.rows }),
         metrics: () => null,
         async fit() {
+          await awaitSurfaceOwner();
           const next = box();
           const scale = document.defaultView?.devicePixelRatio ?? 1;
           // An unchanged box is not a resize. Re-sending it winds the pty
