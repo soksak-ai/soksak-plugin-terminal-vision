@@ -877,20 +877,27 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         root: container,
         size: () => ({ cols: state.cols, rows: state.rows }),
         metrics: () => null,
-        fit() {
+        async fit() {
           const next = box();
           const scale = document.defaultView?.devicePixelRatio ?? 1;
           // An unchanged box is not a resize. Re-sending it winds the pty
           // through SIGWINCH and the shell repaints its prompt every time.
           if (source.pixelW === String(next.width) && source.pixelH === String(next.height)
-            && source.scale === String(scale)) return;
+            && source.scale === String(scale)) {
+            return state.cols > 0 && state.rows > 0 ? { cols: state.cols, rows: state.rows } : undefined;
+          }
           source.pixelW = String(next.width);
           source.pixelH = String(next.height);
           source.scale = String(scale);
           if (declared) screen.setAttribute("data-native-source", JSON.stringify(source));
           // The declaration moves the layer; the verb moves the cells.
-          void deliver({ verb: "resize", pixelW: next.width, pixelH: next.height, scale })
-            .catch(() => {});
+          const applied = await deliver({ verb: "resize", pixelW: next.width, pixelH: next.height, scale });
+          const cols = Number(applied.cols);
+          const rows = Number(applied.rows);
+          if (!Number.isSafeInteger(cols) || cols < 1 || !Number.isSafeInteger(rows) || rows < 1) {
+            throw new Error("surface.resize returned no valid grid");
+          }
+          return { cols, rows };
         },
         ready: awaitSurfaceOwner,
         sendText: async (data) => {

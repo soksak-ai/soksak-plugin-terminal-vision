@@ -42,6 +42,7 @@ function fakeApp(overrides: Partial<SurfaceApp> = {}) {
         if (message.verb === "state") return {
           generation: 7, phase: "live", session: 1, sequence: 3, cols: 80, rows: 24,
         };
+        if (message.verb === "resize") return { cols: 94, rows: 30 };
         return {};
       },
     },
@@ -99,6 +100,20 @@ describe("the vision surface presenter", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     const source = JSON.parse(container.querySelector("[data-native-source]")!.getAttribute("data-native-source")!);
     expect(source.engineUnit).toBe("soksak-sidecar-terminal-vt100");
+    presenter.dispose();
+  });
+
+  it("returns the exact grid applied by surface resize", async () => {
+    const { app } = fakeApp();
+    let width = 640;
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, {
+      ...options,
+      hostPixels: () => ({ width, height: 384 }),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    width = 739;
+    await expect(presenter.fit?.()).resolves.toEqual({ cols: 94, rows: 30 });
     presenter.dispose();
   });
 
