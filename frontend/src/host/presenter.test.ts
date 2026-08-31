@@ -862,6 +862,34 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
+  it("clears a native selection before a keydown reaches the PTY", async () => {
+    const { app, delivered } = fakeApp();
+    const sent: string[] = [];
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(
+      container, "tab-input-keydown-selection.1", (text) => sent.push(text), options,
+    );
+    expect(ingestTerminalSurfaceState({
+      pane: "tab-input-keydown-selection.1", sequence: 1, generation: 7,
+      selection: {
+        active: true, text: "copied", kind: "simple", gestureId: "selection-2",
+        anchor: { row: 1, col: 0, side: "left" },
+        focus: { row: 1, col: 5, side: "right" }, sequence: 1,
+      },
+    })).toBe(true);
+    const input = container.querySelector("textarea")!;
+    input.focus();
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", cancelable: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+    await vi.waitFor(() => expect(sent).toEqual(["\x7f"]));
+    expect(delivered.map(({ message }) => message).filter((message) => message.verb === "selection")).toEqual([
+      { verb: "selection", action: "clear" },
+    ]);
+    expect(sent).toEqual(["\x7f"]);
+    presenter.dispose();
+  });
+
   it("refuses by name when the surface capability is absent", async () => {
     const { app } = fakeApp({ surface: undefined });
     const container = document.createElement("div");

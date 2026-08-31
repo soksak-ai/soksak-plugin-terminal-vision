@@ -405,23 +405,33 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         position: "absolute", left: "0", top: "0", width: "1px", height: "1px",
         opacity: "0", border: "0", padding: "0", resize: "none",
       });
+      // Native key, composition, and paste input all pass through the same
+      // selection transaction before reaching the PTY.
+      function sendInput(data: string): void {
+        if (!state.selection.active) {
+          send(data);
+          return;
+        }
+        void enqueueSelection({ action: "clear" }).then(() => send(data));
+      }
       const onKeydown = (event: KeyboardEvent) => {
         const text = encodeProxyKey(event);
         if (text === null) return;
         event.preventDefault();
-        send(text);
+        sendInput(text);
       };
       input.addEventListener("keydown", onKeydown);
       // Composed text (IME) reaches the pty only when the composition ends;
       // encodeProxyKey drops every keydown while composing.
       const onCompositionEnd = (event: CompositionEvent) => {
-        if (event.data) send(event.data);
+        if (event.data) sendInput(event.data);
         input.value = "";
       };
       const onPaste = (event: ClipboardEvent) => {
         event.preventDefault();
         const text = event.clipboardData?.getData("text") ?? "";
-        if (text) send(text);
+        if (text) sendInput(text);
+        input.value = "";
       };
       input.addEventListener("compositionend", onCompositionEnd);
       input.addEventListener("paste", onPaste);
