@@ -117,6 +117,7 @@ describe("the vision surface presenter", () => {
     expect(delivered.some(({ message }) => message.verb === "resize")).toBe(false);
     expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 1, generation: 7 })).toBe(true);
     await expect(fitted).resolves.toEqual({ cols: 94, rows: 30 });
+    expect(presenter.size()).toEqual({ cols: 94, rows: 30 });
     presenter.dispose();
   });
 

@@ -898,6 +898,8 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           if (!Number.isSafeInteger(cols) || cols < 1 || !Number.isSafeInteger(rows) || rows < 1) {
             throw new Error("surface.resize returned no valid grid");
           }
+          state.cols = cols;
+          state.rows = rows;
           return { cols, rows };
         },
         ready: awaitSurfaceOwner,
