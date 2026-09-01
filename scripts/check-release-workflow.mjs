@@ -25,7 +25,7 @@ for (const boundary of ["command -v soksak-sdk", "STORE", "OUT", "release.json",
   if (!makefile.includes(boundary)) throw new Error(`Makefile release boundary is missing: ${boundary}`);
 }
 if (/SDK_ROOT|SDK_RELEASE|TOOLING_ROOT|TOOLING_RELEASE/.test(makefile)) throw new Error("SDK tooling is selected by PATH, not Make path inputs");
-if (!/^SDK_VERSION := 0\.0\.20$/m.test(makefile)) throw new Error("Makefile must select SDK 0.0.20");
+if (!/^SDK_VERSION := 0\.0\.21$/m.test(makefile)) throw new Error("Makefile must select SDK 0.0.21");
 if (typeof manifest.spec === "string" || "schema" in manifest) throw new Error("plugin manifest repeats schema metadata");
 if (manifest.appVersionRequirement !== "0.0.1") throw new Error("plugin app version requirement must be exact 0.0.1");
 if (!Array.isArray(manifest.runtimeDependencies?.sidecars) || manifest.runtimeDependencies.sidecars.length !== 7) throw new Error("the terminal requires the PTY and every engine Sidecar it offers (7 exact releases)");

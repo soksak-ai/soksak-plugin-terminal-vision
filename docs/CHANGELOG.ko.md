@@ -1,5 +1,9 @@
 # 변경 기록
 
+## 0.0.73
+
+- receipt가 포함된 새 PTY release 0.0.23을 runtime dependency로 고정합니다.
+
 ## 0.0.59
 
 - 네이티브 history와 viewport offset 변경을 event-driven terminal wait가
