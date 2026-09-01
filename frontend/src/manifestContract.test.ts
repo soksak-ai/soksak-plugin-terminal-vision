@@ -49,11 +49,11 @@ describe("terminal plugin manifest contract", () => {
     expect(manifest.runtimeDependencies.sidecars).toEqual([
       { id: "soksak-sidecar-pty", version: "0.0.23" },
       { id: "soksak-sidecar-terminal-alacritty", version: "0.0.47" },
-      { id: "soksak-sidecar-terminal-ghostty", version: "0.0.41" },
-      { id: "soksak-sidecar-terminal-kitty", version: "0.0.37" },
-      { id: "soksak-sidecar-terminal-shitty", version: "0.0.38" },
-      { id: "soksak-sidecar-terminal-vt100", version: "0.0.40" },
-      { id: "soksak-sidecar-terminal-wezterm", version: "0.0.39" },
+      { id: "soksak-sidecar-terminal-ghostty", version: "0.0.43" },
+      { id: "soksak-sidecar-terminal-kitty", version: "0.0.40" },
+      { id: "soksak-sidecar-terminal-shitty", version: "0.0.41" },
+      { id: "soksak-sidecar-terminal-vt100", version: "0.0.42" },
+      { id: "soksak-sidecar-terminal-wezterm", version: "0.0.41" },
     ]);
 
     const setting = (key: string) => manifest.configuration.find((item: { key: string }) => item.key === key);
