@@ -895,8 +895,12 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           const scale = document.defaultView?.devicePixelRatio ?? 1;
           // An unchanged box is not a resize. Re-sending it winds the pty
           // through SIGWINCH and the shell repaints its prompt every time.
+          // A restarted native owner can publish its bootstrap 1×1 grid while the
+          // declaration already has the correct pixels.  Treat that grid as
+          // unsettled and send the resize verb once; otherwise the Kit would accept
+          // 1×1 as a valid fit and announce a live, blank pane.
           if (source.pixelW === String(next.width) && source.pixelH === String(next.height)
-            && source.scale === String(scale)) {
+            && source.scale === String(scale) && state.cols > 1 && state.rows > 1) {
             return state.cols > 0 && state.rows > 0 ? { cols: state.cols, rows: state.rows } : undefined;
           }
           source.pixelW = String(next.width);

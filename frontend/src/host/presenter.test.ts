@@ -121,6 +121,29 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
+  it("forces the native resize when the owner reports its bootstrap 1x1 grid", async () => {
+    let resized = false;
+    const { app, delivered } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => {
+          if (message.verb === "state") return ownedState({ sequence: 1, cols: 1, rows: 1 });
+          if (message.verb === "resize") { resized = true; return { cols: 94, rows: 30 }; }
+          if (message.verb === "focus") return { focused: false, cursorPresentation: "hollow-block" };
+          return {};
+        },
+      },
+    });
+    const presenter = createVisionRenderer(app).create(
+      document.createElement("div"), "tab-bootstrap.1", () => {}, options,
+    );
+    expect(ingestTerminalSurfaceState({ pane: "tab-bootstrap.1", sequence: 1, generation: 7 })).toBe(true);
+    await presenter.ready!();
+    await expect(presenter.fit!()).resolves.toEqual({ cols: 94, rows: 30 });
+    expect(resized).toBe(true);
+    presenter.dispose();
+  });
+
   it("maps every presenter door onto its deliver verb", async () => {
     const { app, delivered } = fakeApp();
     const container = document.createElement("div");
