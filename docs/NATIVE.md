@@ -32,8 +32,10 @@ A pane adds no process. The web content process is not on the hot path.
    coalesced. Focus presentation is painted by the render owner.
 7. The declaration carries an explicit `light|dark` base theme. A host theme epoch sends one
    `surface.theme` command. Only a complete `surface.state` reply becomes `themeStatus`; no
-   unthemed fallback or polling path exists. Text waits subscribe to state events and use one
-   deadline timeout only.
+   unthemed fallback or polling path exists. State events are the normal frame edge, and the
+   presenter performs one owner-state read after registering its door so an event emitted during
+   surface creation cannot strand the owner at its bootstrap `1×1` grid. Text waits subscribe to
+   state events and use one deadline timeout only.
 8. Visibility has two owners. Workbench pane visibility is intrinsic and is the only value written
    to `data-native-visible`. Core workspace, tab and overlay presentation stays on the host
    ancestor; it is never duplicated into the Plugin declaration. Effective visibility controls
@@ -47,7 +49,8 @@ A pane adds no process. The web content process is not on the hot path.
 
 The `shownlog` diagnostic command reports the count and last payload of surface frame events,
 successful state reads and failed reads per pane. A failed state delivery is recorded by name; it
-is not replaced by a timer or retry loop.
+is not replaced by a timer or retry loop. The one-shot owner-state hydration is also counted as a
+state read, making a missed initial event mechanically observable.
 
 ## Seams this plugin consumes
 

@@ -835,7 +835,46 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         surfaceReadySettled = true;
         settleSurfaceReady(ready);
       };
+      let hydrateInFlight: Promise<boolean> | null = null;
+      let stateEventSeen = false;
+      const hydrateFromOwner = (observation: PresenterObservation, force = false): Promise<boolean> => {
+        if (!force && surfaceStateReady) return Promise.resolve(true);
+        if (!force && hydrateInFlight) return hydrateInFlight;
+        const request = (async () => {
+          try {
+            // The state event is an optimization, not the only source of truth. A native
+            // owner may have published its first event before this presenter registered its
+            // door; one explicit read closes that race without introducing a timer or poll.
+            const reply = await deliver({ verb: "state" });
+            observation.stateReads += 1;
+            observation.lastRead = { ...reply };
+            if (reply.generation !== generation || reply.phase !== "live"
+              || !Number.isSafeInteger(reply.session) || Number(reply.session) < 1) {
+              observation.stateFailures += 1;
+              observation.lastError = `terminal surface ${pane} state does not belong to generation ${generation}`;
+              return false;
+            }
+            observation.lastError = null;
+            ingest(reply);
+            surfaceStateReady = true;
+            settleReadiness(true);
+            screen.dataset.surfaceReady = "true";
+            void deliverFocus(document.activeElement === input).catch(() => {});
+            return true;
+          } catch (error) {
+            observation.stateFailures += 1;
+            observation.lastError = String(error);
+            return false;
+          } finally {
+            for (const listener of stateEventListeners) listener();
+            if (!surfaceStateReady) hydrateInFlight = null;
+          }
+        })();
+        if (!force) hydrateInFlight = request;
+        return request;
+      };
       stateDoors.set(pane, (payload) => {
+        stateEventSeen = true;
         const observation = logOf(label);
         observation.stateEvents += 1;
         observation.lastEvent = { ...payload };
@@ -846,29 +885,13 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           return;
         }
         ingest(payload);
-        // The event is the frame edge. Read the richer service-owned state once at that edge;
-        // no timer or polling loop reconstructs cols/rows from the DOM.
-        void deliver({ verb: "state" }).then((reply) => {
-          observation.stateReads += 1;
-          observation.lastRead = { ...reply };
-          if (reply.generation !== generation || reply.phase !== "live"
-            || !Number.isSafeInteger(reply.session) || Number(reply.session) < 1) {
-            observation.stateFailures += 1;
-            observation.lastError = `terminal surface ${pane} state does not belong to generation ${generation}`;
-            return;
-          }
-          observation.lastError = null;
-          ingest(reply);
-          surfaceStateReady = true;
-          settleReadiness(true);
-          screen.dataset.surfaceReady = "true";
-          void deliverFocus(document.activeElement === input).catch(() => {});
-        }).catch((error) => {
-          observation.stateFailures += 1;
-          observation.lastError = String(error);
-        }).finally(() => {
-          for (const listener of stateEventListeners) listener();
-        });
+        // The event is the frame edge; hydrate from the richer service-owned state once.
+        void hydrateFromOwner(observation, true);
+      });
+      // A state event can race presenter registration. Ask the owner once after the door is
+      // installed so a missed event cannot leave the native surface at bootstrap 1×1.
+      queueMicrotask(() => {
+        if (!stateEventSeen) void hydrateFromOwner(logOf(label));
       });
       const readText = async (lines?: number): Promise<string> => {
         const reply = await deliver({ verb: "read", ...(typeof lines === "number" ? { lines } : {}) });

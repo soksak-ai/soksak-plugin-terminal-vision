@@ -33,7 +33,9 @@ pane 은 프로세스를 더하지 않는다. 웹 콘텐츠 프로세스는 뜨�
    owner가 그립니다.
 7. 선언은 명시적인 `light|dark` base theme을 포함한다. Host theme epoch는 `surface.theme`
    command 하나를 보낸다. 완전한 `surface.state` 응답만 `themeStatus`가 되며 unthemed fallback과
-   polling 경로는 없다. Text wait는 state event를 구독하고 deadline timeout 하나만 사용한다.
+   polling 경로는 없다. State event가 일반적인 frame 경계이고, presenter는 자신의 door를 등록한
+   직후 owner state를 한 번 조회한다. 따라서 표면 생성 중 event가 유실되어 owner가 bootstrap
+   `1×1` grid에 멈추지 않는다. Text wait는 state event를 구독하고 deadline timeout 하나만 사용한다.
 8. 가시성 소유자는 둘이다. Workbench pane 가시성은 intrinsic이며 `data-native-visible`에 쓰는
    유일한 값이다. Core workspace, tab, overlay presentation은 host 조상에 남고 Plugin 선언에
    중복하지 않는다. Effective visibility는 render 작업을 결정하고 host dim은 native alpha를
@@ -45,8 +47,9 @@ pane 은 프로세스를 더하지 않는다. 웹 콘텐츠 프로세스는 뜨�
     input을 빼앗지 않고 Shift가 local selection을 강제합니다.
 
 `shownlog` 진단 명령은 pane별 surface frame event, 성공한 state read, 실패한 read의 횟수와
-마지막 payload를 보고한다. state 전달 실패는 이름과 함께 기록하며 timer나 retry loop로 대체하지
-않는다.
+마지막 payload를 보고한다. 초기 event 유실을 보완한 한 번의 owner-state hydration도 state read로
+계수되므로 기계적으로 관측된다. state 전달 실패는 이름과 함께 기록하며 timer나 retry loop로
+대체하지 않는다.
 
 ## 이 플러그인이 소비하는 이음매
 

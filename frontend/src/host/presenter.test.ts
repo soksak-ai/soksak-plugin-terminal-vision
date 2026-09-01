@@ -144,6 +144,29 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
+  it("hydrates from the owner when the initial state event was emitted before registration", async () => {
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (_label, message) => {
+          if (message.verb === "state") return ownedState({ sequence: 1, cols: 80, rows: 24 });
+          return {};
+        },
+      },
+    });
+    const presenter = createVisionRenderer(app).create(
+      document.createElement("div"), "tab-missed-event.1", () => {}, options,
+    );
+    // No terminal-surface.state event is delivered: a one-shot event sent before the
+    // presenter registers its door must not leave the native surface at bootstrap 1×1.
+    await expect(Promise.race([
+      presenter.ready!().then(() => true),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 50)),
+    ])).resolves.toBe(true);
+    expect(presenter.size()).toEqual({ cols: 80, rows: 24 });
+    presenter.dispose();
+  });
+
   it("maps every presenter door onto its deliver verb", async () => {
     const { app, delivered } = fakeApp();
     const container = document.createElement("div");
@@ -267,7 +290,7 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
-  it("waits for text from surface state events without polling", async () => {
+  it("waits for text from owner state hydration without polling", async () => {
     let text = "";
     let reads = 0;
     const { app } = fakeApp({
@@ -287,11 +310,13 @@ describe("the vision surface presenter", () => {
     await Promise.resolve();
     await Promise.resolve();
     await new Promise((resolve) => setTimeout(resolve, 250));
-    expect(reads).toBe(0);
+    // A one-shot owner read is allowed to recover a state event that raced presenter
+    // registration; this is not a polling loop.
+    expect(reads).toBe(1);
     text = "READY";
     expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 2, generation: 7 })).toBe(true);
     await expect(waiting).resolves.toBe("READY");
-    expect(reads).toBe(1);
+    expect(reads).toBe(2);
     presenter.dispose();
   });
 
@@ -381,12 +406,12 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
-  it("reads the rendered sequence from the state push, not from a counter", async () => {
+  it("reads the rendered sequence from owner state, not from a counter", async () => {
     const { app } = fakeApp();
     const container = document.createElement("div");
     const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(presenter.renderedOutputSequence!()).toBeNull();
+    expect(presenter.renderedOutputSequence!()).toBe(3);
     expect(ingestTerminalSurfaceState({ pane: "tab-a.1", sequence: 9, generation: 7, cols: 120, rows: 30 })).toBe(true);
     expect(presenter.renderedOutputSequence!()).toBe(9);
     expect(presenter.size()).toEqual({ cols: 120, rows: 30 });
