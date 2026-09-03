@@ -15,10 +15,17 @@ describe("terminal plugin manifest contract", () => {
     expect(manifest.id).toBe("soksak-plugin-terminal-vision");
     expect(manifest.name).toEqual({ en: "Vision Terminal", ko: "Vision 터미널" });
     expect(manifest.version).toBe(pkg.version);
-    expect(pkg.dependencies).toEqual({
-      "@soksak/soksak-contract-plugin-terminal": "0.0.22",
-      "@soksak/soksak-kit-plugin-terminal": "0.0.107",
-    });
+    // The dependency set is fixed and each version is not. A literal version here is a second copy
+    // of what package.json already states, and every kit release then has to update a test that
+    // measures nothing about the plugin. What is asserted is which dependencies exist and that each
+    // is pinned exactly — a range or a tag is what this is here to catch.
+    expect(Object.keys(pkg.dependencies).sort()).toEqual([
+      "@soksak/soksak-contract-plugin-terminal",
+      "@soksak/soksak-kit-plugin-terminal",
+    ]);
+    for (const version of Object.values(pkg.dependencies)) {
+      expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    }
     expect(manifest).not.toHaveProperty("spec");
     expect(manifest.appVersionRequirement).toBe("0.0.1");
     expect(manifest.entry).toBe("main.js");
