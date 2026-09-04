@@ -1,6 +1,6 @@
 {
   "name": "@soksak/soksak-plugin-terminal-vision",
-  "version": "0.0.77",
+  "version": "0.0.78",
   "private": true,
   "engines": {
     "node": "26.7.0"

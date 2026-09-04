@@ -4,7 +4,7 @@
     "en": "Vision Terminal",
     "ko": "Vision \ud130\ubbf8\ub110"
   },
-  "version": "0.0.77",
+  "version": "0.0.78",
   "appVersionRequirement": "0.0.1",
   "description": {
     "en": "A terminal whose pixels are painted by its render sidecar into a native surface.",
