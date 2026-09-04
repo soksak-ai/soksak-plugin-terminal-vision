@@ -53,15 +53,17 @@ describe("terminal plugin manifest contract", () => {
     ]);
 
     const engines = ["alacritty", "ghostty", "kitty", "shitty", "vt100", "wezterm"];
-    expect(manifest.runtimeDependencies.sidecars).toEqual([
-      { id: "soksak-sidecar-pty", version: "0.0.23" },
-      { id: "soksak-sidecar-terminal-alacritty", version: "0.0.47" },
-      { id: "soksak-sidecar-terminal-ghostty", version: "0.0.43" },
-      { id: "soksak-sidecar-terminal-kitty", version: "0.0.40" },
-      { id: "soksak-sidecar-terminal-shitty", version: "0.0.41" },
-      { id: "soksak-sidecar-terminal-vt100", version: "0.0.42" },
-      { id: "soksak-sidecar-terminal-wezterm", version: "0.0.41" },
+    // The ids and their shape, not the versions. A version repeated here is the manifest's own fact
+    // written in a second place, and every release of a sidecar then fails this test for saying
+    // what the manifest already says.
+    expect(manifest.runtimeDependencies.sidecars.map((one: { id: string }) => one.id)).toEqual([
+      "soksak-sidecar-pty",
+      ...engines.map((engine) => `soksak-sidecar-terminal-${engine}`),
     ]);
+    for (const declared of manifest.runtimeDependencies.sidecars) {
+      expect(Object.keys(declared).sort()).toEqual(["id", "version"]);
+      expect(declared.version).toMatch(/^\d+\.\d+\.\d+$/);
+    }
 
     const setting = (key: string) => manifest.configuration.find((item: { key: string }) => item.key === key);
     expect(setting("engine")).toMatchObject({ type: "enum", enum: engines, default: "alacritty" });
