@@ -448,11 +448,46 @@ describe("the vision surface presenter", () => {
     // would veto the compositor's pre-DOM target stage.
     setVisibility?.({ intrinsicVisible: true, hostVisible: false, effectiveVisible: false, dim: 0.5 });
     expect(screen.dataset.nativeVisible).toBe("true");
-    expect(screen.dataset.nativeAlpha).toBe("0.5");
+    // The surface stays opaque. A dim is what the surface paints, and declared as transparency the
+    // document behind it is on screen through it: the picture that stands in for a parked surface
+    // flashed the pane for two frames either side of the swap (measured 2026-09-04).
+    expect(screen.dataset.nativeAlpha).toBe("1");
 
     // Workbench maximize is intrinsic: that pane's native member itself must be hidden.
     setVisibility?.({ intrinsicVisible: false, hostVisible: true, effectiveVisible: false, dim: 0 });
     expect(screen.dataset.nativeVisible).toBe("false");
+    presenter.dispose();
+  });
+
+  it("hands the dim to the surface, and only when it changes", async () => {
+    const delivered: Delivered[] = [];
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (label, message) => {
+          delivered.push({ label, message });
+          return ownedState();
+        },
+      },
+    });
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
+    const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
+    await vi.waitFor(() => expect(screen.dataset.nativeSurface).toBe("terminal"));
+    const setVisibility = (presenter as typeof presenter & {
+      setVisibility?(value: {
+        intrinsicVisible: boolean; hostVisible: boolean; effectiveVisible: boolean; dim: number;
+      }): void;
+    }).setVisibility!;
+
+    const dims = () => delivered.filter((one) => one.message.verb === "dim").map((one) => one.message.dim);
+    setVisibility({ intrinsicVisible: true, hostVisible: true, effectiveVisible: true, dim: 0.5 });
+    await vi.waitFor(() => expect(dims()).toEqual([0.5]));
+    setVisibility({ intrinsicVisible: true, hostVisible: true, effectiveVisible: true, dim: 0.5 });
+    await new Promise((done) => setTimeout(done, 10));
+    expect(dims(), "an amount that did not change is not sent again").toEqual([0.5]);
+    setVisibility({ intrinsicVisible: true, hostVisible: true, effectiveVisible: true, dim: 0 });
+    await vi.waitFor(() => expect(dims()).toEqual([0.5, 0]));
     presenter.dispose();
   });
 

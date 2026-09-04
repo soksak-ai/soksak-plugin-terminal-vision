@@ -385,7 +385,10 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
             // explicitly requests ordering. The browser surface uses 0; inventing 10 here made
             // terminal and browser presentation differ for no declared reason.
             id: label, generation, source, layer: 0,
-            visible: intrinsicVisible, alpha: 1 - dim,
+            // The surface is opaque. A dim is what the surface paints (surface.dim), and declared
+            // as transparency the document behind it is on screen through it — the picture that
+            // stands in for a parked surface flashed the pane either side of the swap.
+            visible: intrinsicVisible, alpha: 1,
           }),
         )) {
           screen.setAttribute(name, value);
@@ -1039,11 +1042,19 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           });
           if (entry.seq.length > 24) entry.seq.shift();
           intrinsicVisible = next.intrinsicVisible;
+          const dimChanged = dim !== next.dim;
           dim = next.dim;
           if (declared) writeDeclaration();
           else {
             screen.setAttribute("data-native-visible", String(next.intrinsicVisible));
-            screen.setAttribute("data-native-alpha", String(1 - next.dim));
+            screen.setAttribute("data-native-alpha", "1");
+          }
+          // The amount goes to the surface, which paints with it. A failure leaves the pane at the
+          // amount it was painted with and is reported; it does not stop the presentation.
+          if (dimChanged) {
+            void deliver({ verb: "dim", dim }).catch((error: unknown) => {
+              console.error(`vision: the surface did not take the dim for ${label}`, error);
+            });
           }
         },
         scrollState: () => ({ offset: state.offset, historySize: state.historySize }),
