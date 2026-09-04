@@ -377,6 +377,13 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       // document focus-lighting veil cannot darken a child surface composited above it.
       let intrinsicVisible = true;
       let dim = 0;
+      // The amount goes to the surface, which paints with it. A failure leaves the pane at the
+      // amount it was painted with and is reported; it does not stop the presentation.
+      const sendDim = () => {
+        void deliver({ verb: "dim", dim }).catch((error: unknown) => {
+          console.error(`vision: the surface did not take the dim for ${label}`, error);
+        });
+      };
       const writeDeclaration = () => {
         logOf(label).declWrites += 1;
         for (const [name, value] of Object.entries(
@@ -521,6 +528,13 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           presentationChanged = true;
         }
         if (typeof payload.text === "string") state.text = payload.text;
+        // The surface reports the dim it paints with. Published on the screen so a pane drawn at
+        // an amount other than the one decided is a fact anything can read, and corrected here
+        // when it differs: a send that lands before the surface opens reaches no pane.
+        if (typeof payload.dim === "number") {
+          screen.dataset.paintedDim = String(payload.dim);
+          if (Math.abs(payload.dim - dim) > 1e-6) sendDim();
+        }
         const nextModes = surfaceModes(payload.modes);
         if (nextModes) {
           state.modes = nextModes;
@@ -1049,13 +1063,7 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
             screen.setAttribute("data-native-visible", String(next.intrinsicVisible));
             screen.setAttribute("data-native-alpha", "1");
           }
-          // The amount goes to the surface, which paints with it. A failure leaves the pane at the
-          // amount it was painted with and is reported; it does not stop the presentation.
-          if (dimChanged) {
-            void deliver({ verb: "dim", dim }).catch((error: unknown) => {
-              console.error(`vision: the surface did not take the dim for ${label}`, error);
-            });
-          }
+          if (dimChanged) sendDim();
         },
         scrollState: () => ({ offset: state.offset, historySize: state.historySize }),
         async scrollLines(lines) {

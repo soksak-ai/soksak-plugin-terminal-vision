@@ -459,6 +459,48 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
+  // The surface reports the dim it paints with. When that differs from what the application
+  // decided — the first send landed before the surface opened, and the pane was drawn bright where
+  // the application had decided a dim (measured 2026-09-05) — the presenter sends it again. The
+  // report is also published on the screen element, so a mismatch is a fact anything can read.
+  it("corrects the surface when it reports a dim other than the one decided", async () => {
+    const delivered: Delivered[] = [];
+    const { app } = fakeApp({
+      surface: {
+        label: (kind, viewId) => `${kind}.win-test.${viewId}`,
+        deliver: async (label, message) => {
+          delivered.push({ label, message });
+          return ownedState();
+        },
+      },
+    });
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-a.1", () => {}, options);
+    const screen = container.querySelector<HTMLElement>('[data-node="terminal-screen/1"]')!;
+    await vi.waitFor(() => expect(screen.dataset.nativeSurface).toBe("terminal"));
+    const setVisibility = (presenter as typeof presenter & {
+      setVisibility?(value: {
+        intrinsicVisible: boolean; hostVisible: boolean; effectiveVisible: boolean; dim: number;
+      }): void;
+    }).setVisibility!;
+    const dims = () => delivered.filter((one) => one.message.verb === "dim").map((one) => one.message.dim);
+
+    setVisibility({ intrinsicVisible: true, hostVisible: true, effectiveVisible: true, dim: 0.5 });
+    await vi.waitFor(() => expect(dims()).toEqual([0.5]));
+
+    // The surface answers that it paints with 0: the amount did not reach it.
+    ingestTerminalSurfaceState({ pane: "tab-a.1", ...ownedState({ dim: 0 }) });
+    expect(screen.dataset.paintedDim).toBe("0");
+    await vi.waitFor(() => expect(dims()).toEqual([0.5, 0.5]));
+
+    // It answers with the amount decided: nothing more is sent.
+    ingestTerminalSurfaceState({ pane: "tab-a.1", ...ownedState({ dim: 0.5 }) });
+    expect(screen.dataset.paintedDim).toBe("0.5");
+    await new Promise((done) => setTimeout(done, 10));
+    expect(dims()).toEqual([0.5, 0.5]);
+    presenter.dispose();
+  });
+
   it("hands the dim to the surface, and only when it changes", async () => {
     const delivered: Delivered[] = [];
     const { app } = fakeApp({
