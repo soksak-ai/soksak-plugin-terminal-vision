@@ -93,6 +93,44 @@ describe("the vision surface presenter", () => {
     presenter.dispose();
   });
 
+  // Measured 2026-09-05 on a test instance: every session record stood at 1x1. The surface was
+  // declared before its host had a size, with 1x1 standing in for 0x0, the service measured a
+  // one-cell grid from it and the shell started in a one-cell terminal: its prompt came out in
+  // pieces, and every resize after that redrew the pieces. A terminal starts when its slot has a
+  // size, and not before.
+  it("declares no surface while its host has no size", async () => {
+    const { app, delivered } = fakeApp();
+    const container = document.createElement("div");
+    const presenter = createVisionRenderer(app).create(container, "tab-unsized.1", () => {}, {
+      ...options, hostPixels: () => ({ width: 0, height: 0 }),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(container.querySelector("[data-native-surface]")).toBeNull();
+    await presenter.fit!();
+    expect(container.querySelector("[data-native-surface]")).toBeNull();
+    expect(delivered.filter((one) => one.message.verb === "resize")).toHaveLength(0);
+    presenter.dispose();
+  });
+
+  it("declares the surface at the host's first size, with those pixels", async () => {
+    const { app } = fakeApp();
+    const container = document.createElement("div");
+    let pixels = { width: 0, height: 0 };
+    const presenter = createVisionRenderer(app).create(container, "tab-sized.1", () => {}, {
+      ...options, hostPixels: () => pixels,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    pixels = { width: 512, height: 320 };
+    await presenter.fit!();
+    const screen = container.querySelector('[data-native-surface="terminal"]');
+    expect(screen).not.toBeNull();
+    const source = JSON.parse(screen!.getAttribute("data-native-source")!);
+    expect(source.pixelW).toBe("512");
+    expect(source.pixelH).toBe("320");
+    expect(source.shell).toBe("/bin/zsh");
+    presenter.dispose();
+  });
+
   it("honors the engine setting when it names an offered engine", async () => {
     const { app } = fakeApp({ settings: { get: (key) => (key === "engine" ? "vt100" : undefined) } });
     const container = document.createElement("div");
@@ -487,6 +525,7 @@ describe("the vision surface presenter", () => {
 
     setVisibility({ intrinsicVisible: true, hostVisible: true, effectiveVisible: true, dim: 0.5 });
     await vi.waitFor(() => expect(dims()).toEqual([0.5]));
+    expect(screen.dataset.decidedDim).toBe("0.5");
 
     // The surface answers that it paints with 0: the amount did not reach it.
     ingestTerminalSurfaceState({ pane: "tab-a.1", ...ownedState({ dim: 0 }) });

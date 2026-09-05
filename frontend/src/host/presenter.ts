@@ -333,10 +333,14 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       const document = container.ownerDocument;
       const label = surface.label(SURFACE_KIND, surfaceToken(pane));
       const deliver = (message: Record<string, unknown>) => surface.deliver(label, message);
+      // The host's box in whole pixels. A host that has not been laid out has none, and no
+      // number stands in for it: 1x1 did once, the service measured a one-cell grid from it and
+      // the shell started in a one-cell terminal (measured 2026-09-05, every session record at 1x1).
       const box = () => {
         const px = options.hostPixels();
-        return { width: Math.max(1, Math.round(px.width)), height: Math.max(1, Math.round(px.height)) };
+        return { width: Math.round(px.width), height: Math.round(px.height) };
       };
+      const sized = (px: { width: number; height: number }) => px.width > 0 && px.height > 0;
       const settingNumber = (key: string, fallback: number): number => {
         const value = app.settings?.get(key);
         return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
@@ -379,8 +383,12 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
       let dim = 0;
       // The amount goes to the surface, which paints with it. A failure leaves the pane at the
       // amount it was painted with and is reported; it does not stop the presentation.
+      // A refusal is written where a reading of the pane finds it (shownlog lastError): for four
+      // days the service between this presenter and the engine refused the verb, and the only
+      // trace was a console line nobody read (measured 2026-09-05).
       const sendDim = () => {
         void deliver({ verb: "dim", dim }).catch((error: unknown) => {
+          logOf(label).lastError = `the surface did not take dim ${dim}: ${String(error)}`;
           console.error(`vision: the surface did not take the dim for ${label}`, error);
         });
       };
@@ -401,12 +409,24 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           screen.setAttribute(name, value);
         }
       };
-      // The declaration is complete only with the login shell; it lands as
-      // soon as app.environment answers, and never in a partial form.
-      void loginShell().then((shell) => {
-        source.shell = shell;
+      // The declaration is complete only with the login shell and the host's size; it lands as
+      // soon as both are known, and never in a partial form. A terminal starts when its slot has
+      // a size: the declaration is what starts it, so it waits for the first fit that has one.
+      let shellKnown = false;
+      const declareWhenSized = () => {
+        if (declared || !shellKnown) return;
+        const pixels = box();
+        if (!sized(pixels)) return;
+        source.pixelW = String(pixels.width);
+        source.pixelH = String(pixels.height);
+        source.scale = String(document.defaultView?.devicePixelRatio ?? 1);
         declared = true;
         writeDeclaration();
+      };
+      void loginShell().then((shell) => {
+        source.shell = shell;
+        shellKnown = true;
+        declareWhenSized();
       });
       const input = document.createElement("textarea");
       input.dataset.node = terminalNodeId("terminal-input", options.nodeSuffix);
@@ -930,8 +950,17 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
         size: () => ({ cols: state.cols, rows: state.rows }),
         metrics: () => null,
         async fit() {
+          // Before the declaration, a fit with a size is what makes it; the grid comes back with
+          // the owner's first state.
+          if (!declared) {
+            declareWhenSized();
+            return state.cols > 0 && state.rows > 0 ? { cols: state.cols, rows: state.rows } : undefined;
+          }
           await awaitSurfaceOwner();
           const next = box();
+          if (!sized(next)) {
+            return state.cols > 0 && state.rows > 0 ? { cols: state.cols, rows: state.rows } : undefined;
+          }
           const scale = document.defaultView?.devicePixelRatio ?? 1;
           // An unchanged box is not a resize. Re-sending it winds the pty
           // through SIGWINCH and the shell repaints its prompt every time.
@@ -1058,6 +1087,9 @@ export function createVisionRenderer(app: SurfaceApp): TerminalRendererAdapter {
           intrinsicVisible = next.intrinsicVisible;
           const dimChanged = dim !== next.dim;
           dim = next.dim;
+          // The amount the application decided, beside the amount the surface reports painting
+          // with (data-painted-dim). The pair is what a reading of a wrong pane is judged by.
+          screen.dataset.decidedDim = String(dim);
           if (declared) writeDeclaration();
           else {
             screen.setAttribute("data-native-visible", String(next.intrinsicVisible));

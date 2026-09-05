@@ -4,7 +4,7 @@
     "en": "Vision Terminal",
     "ko": "Vision \ud130\ubbf8\ub110"
   },
-  "version": "0.0.88",
+  "version": "0.0.89",
   "appVersionRequirement": "0.0.1",
   "description": {
     "en": "A terminal whose pixels are painted by its render sidecar into a native surface.",
@@ -371,7 +371,7 @@
     "sidecars": [
       {
         "id": "soksak-sidecar-pty",
-        "version": "0.0.23"
+        "version": "0.0.24"
       },
       {
         "id": "soksak-sidecar-terminal-alacritty",
